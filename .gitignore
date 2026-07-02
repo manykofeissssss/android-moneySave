@@ -1,0 +1,39 @@
+﻿# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Android
+local.properties
+app/build/
+app/release/
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Heap dumps / logs
+*.hprof
+*.log
+*.stacktrace
+
+# Output
+outputs/
+work/
+
+# Misc
+*.tmp
+*.bak

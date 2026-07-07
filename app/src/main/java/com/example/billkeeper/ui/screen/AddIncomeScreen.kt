@@ -1,5 +1,7 @@
 ﻿package com.example.billkeeper
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +32,10 @@ fun AddIncomeTab(
     var amountText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val incomes by vm.allIncomes.collectAsState(initial = emptyList())
+    val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -41,13 +48,20 @@ fun AddIncomeTab(
                     Text("录入收入", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(Modifier.height(12.dp))
 
+                    Column { Text("来源", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) }
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                        OutlinedTextField(
-                            value = selectedSource, onValueChange = {}, readOnly = true,
-                            label = { Text("来源") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 12.dp, vertical = 14.dp)
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(selectedSource, fontSize = 16.sp)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
+                            }
+                        }
                         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             INCOME_SOURCES.forEach { src ->
                                 DropdownMenuItem(text = { Text(src) }, onClick = { selectedSource = src; expanded = false })
@@ -65,6 +79,26 @@ fun AddIncomeTab(
                     )
 
                     Spacer(Modifier.height(8.dp))
+                    // 日期选择行
+                    Text("日期", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                            .clickable { showDatePicker = true }
+                            .padding(horizontal = 12.dp, vertical = 14.dp)
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(dateFmt.format(Date(selectedDate)), fontSize = 16.sp)
+                            }
+                            Icon(Icons.Default.Edit, contentDescription = "选择日期", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = noteText, onValueChange = { noteText = it },
                         label = { Text("备注（可选）") },
@@ -75,7 +109,7 @@ fun AddIncomeTab(
                     Button(
                         onClick = {
                             val amt = amountText.toDoubleOrNull()
-                            if (amt != null && amt > 0) { vm.addIncome(selectedSource, amt, noteText); amountText = ""; noteText = "" }
+                            if (amt != null && amt > 0) { vm.addIncome(selectedSource, amt, noteText, selectedDate); amountText = ""; noteText = ""; selectedDate = System.currentTimeMillis() }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
@@ -97,6 +131,25 @@ fun AddIncomeTab(
             items(incomes, key = { it.id }) { income ->
                 IncomeRow(income = income, onEdit = onEditIncome, onDelete = onDeleteIncome)
             }
+        }
+    }
+
+    // ── 日期选择器弹窗 ──
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedDate = it }
+                    showDatePicker = false
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

@@ -2,24 +2,103 @@
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import java.util.*
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
+    // ── 全量数据（底部栏） ──
     val allBills = repo.allBills
     val allIncomes = repo.allIncomes
     val categorySummary = repo.categorySummary
     val totalExpense = repo.totalExpense
     val totalIncome = repo.totalIncome
 
-    // 一次性事件：Snackbar 消息
+    // ── 月份选择 ──
+    private val calendar = Calendar.getInstance()
+    private val _selectedYear = MutableStateFlow(calendar.get(Calendar.YEAR))
+    private val _selectedMonth = MutableStateFlow(calendar.get(Calendar.MONTH)) // 0-based
+    val selectedYear: StateFlow<Int> = _selectedYear.asStateFlow()
+    val selectedMonth: StateFlow<Int> = _selectedMonth.asStateFlow()
+
+    val monthLabel: StateFlow<String> = combine(_selectedYear, _selectedMonth) { year, month ->
+        "${year}年${month + 1}月"
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    // 当前选中月份的起止毫秒
+    private val monthRange: Flow<Pair<Long, Long>> = combine(_selectedYear, _selectedMonth) { year, month ->
+        val cal = Calendar.getInstance()
+        cal.set(year, month, 1, 0, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val start = cal.timeInMillis
+        cal.set(year, month, cal.getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        val end = cal.timeInMillis
+        start to end
+    }
+
+    // 上月范围（用于环比）
+    private val prevMonthRange: Flow<Pair<Long, Long>> = combine(_selectedYear, _selectedMonth) { year, month ->
+        val cal = Calendar.getInstance()
+        cal.set(year, month - 1, 1, 0, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val start = cal.timeInMillis
+        cal.set(year, month - 1, cal.getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        val end = cal.timeInMillis
+        start to end
+    }
+
+    // ── 月度数据 ──
+    val monthlyBills: Flow<List<BillItem>> = monthRange.flatMapLatest { (s, e) ->
+        repo.getBillsByMonth(s, e)
+    }
+    val monthlyCategorySummary: Flow<List<CategorySummary>> = monthRange.flatMapLatest { (s, e) ->
+        repo.getCategorySummaryByMonth(s, e)
+    }
+    val monthlyTotalExpense: Flow<Double> = monthRange.flatMapLatest { (s, e) ->
+        repo.getTotalExpenseByMonth(s, e)
+    }
+    val monthlyIncomes: Flow<List<IncomeItem>> = monthRange.flatMapLatest { (s, e) ->
+        repo.getIncomesByMonth(s, e)
+    }
+    val monthlyTotalIncome: Flow<Double> = monthRange.flatMapLatest { (s, e) ->
+        repo.getTotalIncomeByMonth(s, e)
+    }
+    // 上月总支出（环比）
+    val prevMonthTotalExpense: Flow<Double> = prevMonthRange.flatMapLatest { (s, e) ->
+        repo.getTotalExpenseByMonth(s, e)
+    }
+
+    fun goToPreviousMonth() {
+        val cal = Calendar.getInstance()
+        cal.set(_selectedYear.value, _selectedMonth.value, 1)
+        cal.add(Calendar.MONTH, -1)
+        _selectedYear.value = cal.get(Calendar.YEAR)
+        _selectedMonth.value = cal.get(Calendar.MONTH)
+    }
+
+    fun goToNextMonth() {
+        val cal = Calendar.getInstance()
+        cal.set(_selectedYear.value, _selectedMonth.value, 1)
+        cal.add(Calendar.MONTH, 1)
+        _selectedYear.value = cal.get(Calendar.YEAR)
+        _selectedMonth.value = cal.get(Calendar.MONTH)
+    }
+
+    fun jumpToCurrentMonth() {
+        val now = Calendar.getInstance()
+        _selectedYear.value = now.get(Calendar.YEAR)
+        _selectedMonth.value = now.get(Calendar.MONTH)
+    }
+
+    // ── 一次性事件：Snackbar 消息 ──
     private val _snackbarMessage = MutableSharedFlow<String>()
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
 
-    // ── 账单操作 ──
+    // ── 账单操作（支持指定日期） ──
 
     fun addBill(category: String, amount: Double, note: String, date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
@@ -55,7 +134,7 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
 
     suspend fun getBillById(id: Int) = repo.getBillById(id)
 
-    // ── 收入操作 ──
+    // ── 收入操作（支持指定日期） ──
 
     fun addIncome(source: String, amount: Double, note: String, date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {

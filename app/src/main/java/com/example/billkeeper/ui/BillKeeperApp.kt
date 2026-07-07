@@ -1,26 +1,14 @@
 ﻿package com.example.billkeeper
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,9 +16,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("支出总览", "记录支出", "录入收入")
 
-    val bills by vm.allBills.collectAsState(initial = emptyList())
-    val incomes by vm.allIncomes.collectAsState(initial = emptyList())
-    val catSummary by vm.categorySummary.collectAsState(initial = emptyList())
+    // 底部栏需要的全量数据
     val totalExp by vm.totalExpense.collectAsState(initial = 0.0)
     val totalInc by vm.totalIncome.collectAsState(initial = 0.0)
 
@@ -97,22 +83,15 @@ fun BillKeeperApp(vm: LedgerViewModel) {
                 }
             }
 
-            // 三页始终存活，只控制可见性 — 消除 Tab 切换卡顿
+            // 只渲染当前选中 Tab，避免不可见层拦截触摸事件
             Box(modifier = Modifier.weight(1f)) {
-                // Tab 0: 支出总览
-                Box(modifier = if (selectedTab == 0) Modifier.fillMaxSize() else Modifier.fillMaxSize().alpha(0f).height(0.dp)) {
-                    ExpenseSummaryTab(catSummary, totalExp, bills.size)
-                }
-                // Tab 1: 记录支出
-                Box(modifier = if (selectedTab == 1) Modifier.fillMaxSize() else Modifier.fillMaxSize().alpha(0f).height(0.dp)) {
-                    ImportBillTab(vm,
+                when (selectedTab) {
+                    0 -> ExpenseSummaryTab(vm)
+                    1 -> ImportBillTab(vm,
                         onEditBill = { billToEdit = it },
                         onDeleteBill = { billToDelete = it }
                     )
-                }
-                // Tab 2: 录入收入
-                Box(modifier = if (selectedTab == 2) Modifier.fillMaxSize() else Modifier.fillMaxSize().alpha(0f).height(0.dp)) {
-                    AddIncomeTab(vm,
+                    2 -> AddIncomeTab(vm,
                         onEditIncome = { incomeToEdit = it },
                         onDeleteIncome = { incomeToDelete = it }
                     )

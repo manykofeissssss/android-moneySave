@@ -1,4 +1,4 @@
-﻿package com.example.billkeeper
+package com.example.billkeeper
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +34,7 @@ fun AddIncomeTab(
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
-    val incomes by vm.allIncomes.collectAsState(initial = emptyList())
+    val incomes by vm.monthlyIncomes.collectAsState()
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     LazyColumn(
@@ -48,7 +48,7 @@ fun AddIncomeTab(
                     Text("录入收入", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(Modifier.height(12.dp))
 
-                    Column { Text("来源", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) }
+                    Text("来源", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                         Box(
                             modifier = Modifier
@@ -79,7 +79,6 @@ fun AddIncomeTab(
                     )
 
                     Spacer(Modifier.height(8.dp))
-                    // 日期选择行
                     Text("日期", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                     Box(
                         modifier = Modifier
@@ -123,7 +122,7 @@ fun AddIncomeTab(
             }
         }
 
-        item { Text("收入记录  (${incomes.size})", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
+        item { Text("本月收入  (${incomes.size})", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
 
         if (incomes.isEmpty()) {
             item { Text("还没有收入记录", color = Color.Gray, modifier = Modifier.padding(vertical = 16.dp)) }
@@ -134,7 +133,6 @@ fun AddIncomeTab(
         }
     }
 
-    // ── 日期选择器弹窗 ──
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
         DatePickerDialog(

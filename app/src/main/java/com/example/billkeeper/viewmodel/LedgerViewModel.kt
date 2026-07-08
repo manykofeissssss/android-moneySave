@@ -10,8 +10,10 @@ import java.util.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
     // ── 全量数据（底部栏） ──
-    val allBills = repo.allBills
-    val allIncomes = repo.allIncomes
+    val allBills: StateFlow<List<BillItem>> = repo.allBills
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allIncomes: StateFlow<List<IncomeItem>> = repo.allIncomes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val categorySummary = repo.categorySummary
     val totalExpense = repo.totalExpense
     val totalIncome = repo.totalIncome
@@ -51,26 +53,31 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         start to end
     }
 
-    // ── 月度数据 ──
-    val monthlyBills: Flow<List<BillItem>> = monthRange.flatMapLatest { (s, e) ->
+    // ── 月度数据（StateFlow：切换 Tab 回来时立即拿到已缓存值，无初始空值闪烁） ──
+    val monthlyBills: StateFlow<List<BillItem>> = monthRange.flatMapLatest { (s, e) ->
         repo.getBillsByMonth(s, e)
-    }
-    val monthlyCategorySummary: Flow<List<CategorySummary>> = monthRange.flatMapLatest { (s, e) ->
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyCategorySummary: StateFlow<List<CategorySummary>> = monthRange.flatMapLatest { (s, e) ->
         repo.getCategorySummaryByMonth(s, e)
-    }
-    val monthlyTotalExpense: Flow<Double> = monthRange.flatMapLatest { (s, e) ->
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyTotalExpense: StateFlow<Double> = monthRange.flatMapLatest { (s, e) ->
         repo.getTotalExpenseByMonth(s, e)
-    }
-    val monthlyIncomes: Flow<List<IncomeItem>> = monthRange.flatMapLatest { (s, e) ->
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val monthlyIncomes: StateFlow<List<IncomeItem>> = monthRange.flatMapLatest { (s, e) ->
         repo.getIncomesByMonth(s, e)
-    }
-    val monthlyTotalIncome: Flow<Double> = monthRange.flatMapLatest { (s, e) ->
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyTotalIncome: StateFlow<Double> = monthRange.flatMapLatest { (s, e) ->
         repo.getTotalIncomeByMonth(s, e)
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
     // 上月总支出（环比）
-    val prevMonthTotalExpense: Flow<Double> = prevMonthRange.flatMapLatest { (s, e) ->
+    val prevMonthTotalExpense: StateFlow<Double> = prevMonthRange.flatMapLatest { (s, e) ->
         repo.getTotalExpenseByMonth(s, e)
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     fun goToPreviousMonth() {
         val cal = Calendar.getInstance()

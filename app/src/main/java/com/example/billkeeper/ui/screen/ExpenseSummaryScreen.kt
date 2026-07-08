@@ -18,11 +18,11 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ExpenseSummaryTab(vm: LedgerViewModel) {
-    val monthlyTotalExp by vm.monthlyTotalExpense.collectAsState(initial = 0.0)
-    val monthlyTotalInc by vm.monthlyTotalIncome.collectAsState(initial = 0.0)
-    val monthlyCatSummary by vm.monthlyCategorySummary.collectAsState(initial = emptyList())
-    val monthlyBills by vm.monthlyBills.collectAsState(initial = emptyList())
-    val prevMonthExp by vm.prevMonthTotalExpense.collectAsState(initial = 0.0)
+    val monthlyTotalExp by vm.monthlyTotalExpense.collectAsState()
+    val monthlyTotalInc by vm.monthlyTotalIncome.collectAsState()
+    val monthlyCatSummary by vm.monthlyCategorySummary.collectAsState()
+    val monthlyBills by vm.monthlyBills.collectAsState()
+    val prevMonthExp by vm.prevMonthTotalExpense.collectAsState()
     val monthLabel by vm.monthLabel.collectAsState()
 
     // 环比变化

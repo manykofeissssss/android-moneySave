@@ -1,6 +1,9 @@
-﻿package com.example.billkeeper
+package com.example.billkeeper
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -9,12 +12,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun BillKeeperApp(vm: LedgerViewModel) {
-    var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("支出总览", "记录支出", "录入收入")
+    val pagerState = rememberPagerState { tabs.size }
+    val coroutineScope = rememberCoroutineScope()
 
     // 底部栏需要的全量数据
     val totalExp by vm.totalExpense.collectAsState(initial = 0.0)
@@ -70,22 +75,30 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             TabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = pagerState.currentPage,
                 containerColor = Color.White,
                 contentColor = Color(0xFF1B5E20)
             ) {
                 tabs.forEachIndexed { idx, title ->
                     Tab(
-                        selected = selectedTab == idx,
-                        onClick = { selectedTab = idx },
-                        text = { Text(title, fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal) }
+                        selected = pagerState.currentPage == idx,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(idx) } },
+                        text = {
+                            Text(
+                                title,
+                                fontWeight = if (pagerState.currentPage == idx) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     )
                 }
             }
 
-            // 只渲染当前选中 Tab，避免不可见层拦截触摸事件
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTab) {
+            // HorizontalPager 保留各页 Composable 状态，切换时无需重建
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f)
+            ) { page ->
+                when (page) {
                     0 -> ExpenseSummaryTab(vm)
                     1 -> ImportBillTab(vm,
                         onEditBill = { billToEdit = it },

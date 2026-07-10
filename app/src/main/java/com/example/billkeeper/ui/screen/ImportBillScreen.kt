@@ -1,4 +1,4 @@
-package com.example.billkeeper
+﻿package com.example.billkeeper
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +36,19 @@ fun ImportBillTab(
     var showDatePicker by remember { mutableStateOf(false) }
     val bills by vm.monthlyBills.collectAsState()
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+
+    // 计算本月各分类支出合计，用于扇形图
+    val pieSlices = remember(bills) {
+        bills.groupBy { it.category }
+            .map { (cat, items) ->
+                PieSlice(
+                    label = cat,
+                    value = items.sumOf { it.amount },
+                    color = CATEGORY_COLORS[cat] ?: Color.Gray
+                )
+            }
+            .filter { it.value > 0 }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -122,6 +135,23 @@ fun ImportBillTab(
             }
         }
 
+        // 扇形图
+        if (pieSlices.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    PieChart(
+                        slices = pieSlices,
+                        title = "本月支出分布",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+
         item { Text("本月账单  (${bills.size})", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
 
         if (bills.isEmpty()) {
@@ -151,3 +181,4 @@ fun ImportBillTab(
         }
     }
 }
+

@@ -1,4 +1,4 @@
-package com.example.billkeeper
+﻿package com.example.billkeeper
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -94,7 +94,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             }
 
             // HorizontalPager 保留各页 Composable 状态，切换时无需重建
-            HorizontalPager(
+            HorizontalPager(beyondBoundsPageCount = 0, 
                 state = pagerState,
                 modifier = Modifier.weight(1f)
             ) { page ->
@@ -145,3 +145,4 @@ fun BillKeeperApp(vm: LedgerViewModel) {
         )
     }
 }
+

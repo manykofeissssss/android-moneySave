@@ -1,4 +1,4 @@
-package com.example.billkeeper
+﻿package com.example.billkeeper
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +36,19 @@ fun AddIncomeTab(
     var showDatePicker by remember { mutableStateOf(false) }
     val incomes by vm.monthlyIncomes.collectAsState()
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+
+    // 计算本月各来源收入合计，用于扇形图
+    val incomePieSlices = remember(incomes) {
+        incomes.groupBy { it.source }
+            .map { (src, items) ->
+                PieSlice(
+                    label = src,
+                    value = items.sumOf { it.amount },
+                    color = INCOME_COLORS[src] ?: Color.Gray
+                )
+            }
+            .filter { it.value > 0 }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -118,6 +131,23 @@ fun AddIncomeTab(
                         Spacer(Modifier.width(8.dp))
                         Text("记一笔")
                     }
+                }
+            }
+        }
+
+        // 扇形图
+        if (incomePieSlices.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    PieChart(
+                        slices = incomePieSlices,
+                        title = "本月收入来源",
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
             }
         }

@@ -152,7 +152,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
         if (monthlyCatSummary.isEmpty()) {
             item { Text("暂无支出记录", color = Color.Gray, modifier = Modifier.padding(vertical = 20.dp)) }
         } else {
-            items(monthlyCatSummary) { cat -> CategoryRow(cat) }
+            items(monthlyCatSummary, key = { it.category }) { cat -> CategoryRow(cat) }
         }
 
         // ── 回到本月按钮 ──
@@ -170,3 +170,4 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
         }
     }
 }
+

@@ -1,4 +1,4 @@
-package com.example.billkeeper
+﻿package com.example.billkeeper
 
 import androidx.compose.ui.graphics.Color
 
@@ -15,4 +15,14 @@ val CATEGORY_COLORS = mapOf(
     "医疗" to Color(0xFFBCAAA4),
     "教育" to Color(0xFFFFD54F),
     "其他" to Color(0xFF90A4AE)
+)
+
+val INCOME_COLORS = mapOf(
+    "工资" to Color(0xFF43A047),
+    "兼职" to Color(0xFF26A69A),
+    "投资" to Color(0xFF5C6BC0),
+    "理财" to Color(0xFFAB47BC),
+    "红包" to Color(0xFFEF5350),
+    "报销" to Color(0xFFFFA726),
+    "其他" to Color(0xFF78909C)
 )

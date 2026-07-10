@@ -1,5 +1,6 @@
 ﻿package com.example.billkeeper
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -267,4 +268,95 @@ fun EditIncomeDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
+}
+
+
+
+
+
+// ═══════════════════════════════ 扇形图组件 ═══════════════════════════════
+
+data class PieSlice(val label: String, val value: Double, val color: Color)
+
+@Composable
+fun PieChart(
+    slices: List<PieSlice>,
+    modifier: Modifier = Modifier,
+    title: String = ""
+) {
+    val total = slices.sumOf { it.value }
+    if (total <= 0 || slices.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text("暂无数据", color = Color.Gray, fontSize = 14.sp)
+        }
+        return
+    }
+
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (title.isNotEmpty()) {
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
+        }
+
+        // 环形图（key 隔离，仅 slices 变化时重绘 Canvas）
+        key(slices) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val canvasSize = this.size
+                    val canvasCenter = this.center
+                    var startAngle = -90f
+                    slices.forEach { slice ->
+                        val sweep = (slice.value / total * 360).toFloat()
+                        drawArc(
+                            color = slice.color,
+                            startAngle = startAngle,
+                            sweepAngle = sweep,
+                            useCenter = true,
+                            size = canvasSize
+                        )
+                        startAngle += sweep
+                    }
+                    val holeRadius = canvasSize.minDimension * 0.32f
+                    drawCircle(
+                        color = Color.White,
+                        radius = holeRadius,
+                        center = canvasCenter
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("¥%.0f".format(total), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
+                    Text("合计", fontSize = 11.sp, color = Color.Gray)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        val sorted = slices.sortedByDescending { it.value }
+        val chunked = sorted.chunked(2)
+        chunked.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                row.forEach { slice ->
+                    val pct = if (total > 0) "%.1f%%".format(slice.value / total * 100) else "0%"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(10.dp)
+                                .background(slice.color, RoundedCornerShape(2.dp))
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(slice.label, fontSize = 12.sp, color = Color.DarkGray, modifier = Modifier.weight(1f))
+                        Text(pct, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                    }
+                }
+                if (row.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
 }

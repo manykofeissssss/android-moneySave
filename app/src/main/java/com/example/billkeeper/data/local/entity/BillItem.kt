@@ -1,12 +1,15 @@
-package com.example.billkeeper
+package com.example.billkeeper.data.local.entity
 
 import androidx.room.*
 
-@Entity(tableName = "bills")
+@Entity(
+    tableName = "bills",
+    indices = [Index(value = ["date"]), Index(value = ["category"])]
+)
 data class BillItem(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val category: String,
-    val amount: Double,
+    val amountCents: Long,
     val date: Long,
     val note: String = ""
 )

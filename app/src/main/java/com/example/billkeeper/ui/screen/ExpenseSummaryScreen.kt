@@ -1,40 +1,57 @@
-﻿package com.example.billkeeper
+package com.example.billkeeper.ui.screen
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.billkeeper.data.model.formatCurrency
+import com.example.billkeeper.ui.shared.CategoryRow
+import com.example.billkeeper.viewmodel.LedgerViewModel
+import kotlin.math.abs
 
 @Composable
 fun ExpenseSummaryTab(vm: LedgerViewModel) {
-    val monthlyTotalExp by vm.monthlyTotalExpense.collectAsState()
-    val monthlyTotalInc by vm.monthlyTotalIncome.collectAsState()
-    val monthlyCatSummary by vm.monthlyCategorySummary.collectAsState()
-    val monthlyBills by vm.monthlyBills.collectAsState()
-    val prevMonthExp by vm.prevMonthTotalExpense.collectAsState()
-    val monthLabel by vm.monthLabel.collectAsState()
+    val uiState by vm.monthlyUiState.collectAsStateWithLifecycle()
+    val monthlyTotalExp = uiState.totalExpenseCents
+    val monthlyTotalInc = uiState.totalIncomeCents
+    val prevMonthExp = uiState.prevMonthExpenseCents
 
-    // 环比变化
-    val momChange: Double = if (prevMonthExp > 0) monthlyTotalExp - prevMonthExp else 0.0
-    val momPercent: Double = if (prevMonthExp > 0) (momChange / prevMonthExp) * 100 else 0.0
+    val momChange = if (prevMonthExp > 0) monthlyTotalExp - prevMonthExp else 0L
+    val momPercent = if (prevMonthExp > 0) (momChange.toDouble() / prevMonthExp) * 100 else 0.0
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── 月份选择器 ──
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -50,7 +67,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                         Icon(Icons.Default.ChevronLeft, contentDescription = "上月")
                     }
                     Text(
-                        monthLabel,
+                        uiState.monthLabel,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = Color(0xFF1B5E20)
@@ -62,7 +79,6 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             }
         }
 
-        // ── 月度概览卡片 ──
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -75,7 +91,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 ) {
                     Text("月度支出", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
                     Text(
-                        "¥ %.2f".format(monthlyTotalExp),
+                        formatCurrency(monthlyTotalExp),
                         color = Color.White,
                         fontSize = 36.sp,
                         fontWeight = FontWeight.Bold
@@ -85,23 +101,25 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
-                            "共 ${monthlyBills.size} 笔",
+                            "共 ${uiState.bills.size} 笔",
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 13.sp
                         )
                         if (monthlyTotalInc > 0) {
                             Text(
-                                "  |  收入 ¥%.2f".format(monthlyTotalInc),
+                                "  |  收入 ${formatCurrency(monthlyTotalInc)}",
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 13.sp
                             )
                         }
                     }
-                    // 结余
                     Text(
-                        "结余 ¥%.2f".format(monthlyTotalInc - monthlyTotalExp),
-                        color = if (monthlyTotalInc - monthlyTotalExp >= 0)
-                            Color(0xFFA5D6A7) else Color(0xFFEF9A9A),
+                        "结余 ${formatCurrency(monthlyTotalInc - monthlyTotalExp)}",
+                        color = if (monthlyTotalInc - monthlyTotalExp >= 0) {
+                            Color(0xFFA5D6A7)
+                        } else {
+                            Color(0xFFEF9A9A)
+                        },
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp)
@@ -110,7 +128,6 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             }
         }
 
-        // ── 环比对比条 ──
         item {
             if (prevMonthExp > 0) {
                 Card(
@@ -126,15 +143,21 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                         Text("较上月", fontSize = 14.sp, color = Color.Gray)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val arrow = if (momChange > 0) "↑" else if (momChange < 0) "↓" else "→"
-                            val changeColor = if (momChange > 0) Color(0xFFC62828) else if (momChange < 0) Color(0xFF2E7D32) else Color.Gray
+                            val changeColor = if (momChange > 0) {
+                                Color(0xFFC62828)
+                            } else if (momChange < 0) {
+                                Color(0xFF2E7D32)
+                            } else {
+                                Color.Gray
+                            }
                             Text(
-                                "$arrow ¥%.2f".format(kotlin.math.abs(momChange)),
+                                "$arrow ${formatCurrency(abs(momChange))}",
                                 color = changeColor,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
                             Text(
-                                " (%.1f%%)".format(kotlin.math.abs(momPercent)),
+                                " (%.1f%%)".format(abs(momPercent)),
                                 color = changeColor.copy(alpha = 0.7f),
                                 fontSize = 13.sp
                             )
@@ -144,18 +167,16 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             }
         }
 
-        // ── 分类汇总标题 ──
         item {
             Text("按分类汇总", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp))
         }
 
-        if (monthlyCatSummary.isEmpty()) {
+        if (uiState.categorySummary.isEmpty()) {
             item { Text("暂无支出记录", color = Color.Gray, modifier = Modifier.padding(vertical = 20.dp)) }
         } else {
-            items(monthlyCatSummary, key = { it.category }) { cat -> CategoryRow(cat) }
+            items(uiState.categorySummary, key = { it.category }) { cat -> CategoryRow(cat) }
         }
 
-        // ── 回到本月按钮 ──
         item {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
@@ -164,10 +185,9 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.size(6.dp))
                 Text("回到本月")
             }
         }
     }
 }
-

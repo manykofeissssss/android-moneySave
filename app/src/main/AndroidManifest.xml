@@ -2,13 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".BillKeeperApplication"
         android:allowBackup="true"
         android:label="记账本"
         android:supportsRtl="true"
         android:theme="@style/Theme.BillKeeper">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.BillKeeper">
             <intent-filter>

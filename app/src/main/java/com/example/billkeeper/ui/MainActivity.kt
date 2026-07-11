@@ -1,21 +1,23 @@
-package com.example.billkeeper
+package com.example.billkeeper.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
-import androidx.room.Room
-
+import com.example.billkeeper.BillKeeperApplication
+import com.example.billkeeper.viewmodel.LedgerViewModel
+import com.example.billkeeper.viewmodel.LedgerViewModelFactory
 
 class MainActivity : ComponentActivity() {
+    private val vm: LedgerViewModel by viewModels {
+        LedgerViewModelFactory((application as BillKeeperApplication).repository)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "billkeeper.db").build()
-        val repo = LedgerRepository(db)
-        val vm = LedgerViewModel(repo)
 
         setContent {
             MaterialTheme(

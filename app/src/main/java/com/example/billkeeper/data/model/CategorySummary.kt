@@ -1,6 +1,6 @@
-package com.example.billkeeper
+package com.example.billkeeper.data.model
 
 data class CategorySummary(
     val category: String,
-    val total: Double
+    val totalCents: Long
 )

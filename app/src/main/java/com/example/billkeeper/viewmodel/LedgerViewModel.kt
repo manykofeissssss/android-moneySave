@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.YearMonth
+import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
 
@@ -33,6 +34,16 @@ data class MonthlyUiState(
     val totalExpenseCents: Long,
     val totalIncomeCents: Long,
     val prevMonthExpenseCents: Long
+)
+
+sealed interface DeletedLedgerEntry {
+    data class Bill(val item: BillItem) : DeletedLedgerEntry
+    data class Income(val item: IncomeItem) : DeletedLedgerEntry
+}
+
+data class LedgerSnackbarEvent(
+    val message: String,
+    val deletedEntry: DeletedLedgerEntry? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -152,15 +163,17 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         _selectedMonth.value = now.monthValue - 1
     }
 
-    private val _snackbarMessage = MutableSharedFlow<String>()
-    val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
+    private val _snackbarEvents = MutableSharedFlow<LedgerSnackbarEvent>()
+    val snackbarEvents: SharedFlow<LedgerSnackbarEvent> = _snackbarEvents.asSharedFlow()
 
     fun addBill(category: String, amountCents: Long, note: String, date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
             try {
                 repo.insertBill(BillItem(category = category, amountCents = amountCents, date = date, note = note))
+                selectMonthContaining(date)
+                _snackbarEvents.emit(LedgerSnackbarEvent("支出已记录"))
             } catch (e: Exception) {
-                _snackbarMessage.emit("添加失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("添加失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
@@ -169,9 +182,9 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 repo.updateBill(bill)
-                _snackbarMessage.emit("已更新")
+                _snackbarEvents.emit(LedgerSnackbarEvent("已更新"))
             } catch (e: Exception) {
-                _snackbarMessage.emit("更新失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("更新失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
@@ -180,9 +193,14 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 repo.deleteBill(bill)
-                _snackbarMessage.emit("已删除")
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent(
+                        message = "支出已删除",
+                        deletedEntry = DeletedLedgerEntry.Bill(bill)
+                    )
+                )
             } catch (e: Exception) {
-                _snackbarMessage.emit("删除失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("删除失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
@@ -193,8 +211,10 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 repo.insertIncome(IncomeItem(source = source, amountCents = amountCents, date = date, note = note))
+                selectMonthContaining(date)
+                _snackbarEvents.emit(LedgerSnackbarEvent("收入已记录"))
             } catch (e: Exception) {
-                _snackbarMessage.emit("添加失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("添加失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
@@ -203,9 +223,9 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 repo.updateIncome(income)
-                _snackbarMessage.emit("已更新")
+                _snackbarEvents.emit(LedgerSnackbarEvent("已更新"))
             } catch (e: Exception) {
-                _snackbarMessage.emit("更新失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("更新失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
@@ -214,14 +234,39 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 repo.deleteIncome(income)
-                _snackbarMessage.emit("已删除")
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent(
+                        message = "收入已删除",
+                        deletedEntry = DeletedLedgerEntry.Income(income)
+                    )
+                )
             } catch (e: Exception) {
-                _snackbarMessage.emit("删除失败：${e.localizedMessage ?: "未知错误"}")
+                _snackbarEvents.emit(LedgerSnackbarEvent("删除失败：${e.localizedMessage ?: "未知错误"}"))
+            }
+        }
+    }
+
+    fun restoreDeletedEntry(entry: DeletedLedgerEntry) {
+        viewModelScope.launch {
+            try {
+                when (entry) {
+                    is DeletedLedgerEntry.Bill -> repo.insertBill(entry.item)
+                    is DeletedLedgerEntry.Income -> repo.insertIncome(entry.item)
+                }
+                _snackbarEvents.emit(LedgerSnackbarEvent("已撤销删除"))
+            } catch (e: Exception) {
+                _snackbarEvents.emit(LedgerSnackbarEvent("撤销失败：${e.localizedMessage ?: "未知错误"}"))
             }
         }
     }
 
     suspend fun getIncomeById(id: Int) = repo.getIncomeById(id)
+
+    private fun selectMonthContaining(timestamp: Long) {
+        val month = yearMonthForMillis(timestamp)
+        _selectedYear.value = month.year
+        _selectedMonth.value = month.monthValue - 1
+    }
 }
 
 class LedgerViewModelFactory(
@@ -246,3 +291,8 @@ internal fun monthRangeMillis(
     val endExclusive = month.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     return start to endExclusive
 }
+
+internal fun yearMonthForMillis(
+    timestamp: Long,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): YearMonth = YearMonth.from(Instant.ofEpochMilli(timestamp).atZone(zoneId))

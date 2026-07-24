@@ -2,6 +2,8 @@ package com.example.billkeeper.ui.shared
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +20,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -32,8 +35,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -156,28 +161,6 @@ fun IncomeRow(
     }
 }
 
-@Composable
-fun DeleteConfirmDialog(
-    title: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFC62828)) },
-        title = { Text("确认删除") },
-        text = { Text("确定要删除「$title」吗？此操作不可撤销。") },
-        confirmButton = {
-            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFC62828))) {
-                Text("删除")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditBillDialog(
@@ -189,6 +172,7 @@ fun EditBillDialog(
     var amountText by remember { mutableStateOf(centsToYuanText(bill.amountCents)) }
     var amountError by remember { mutableStateOf<String?>(null) }
     var noteText by remember { mutableStateOf(bill.note) }
+    var selectedDate by remember { mutableLongStateOf(bill.date) }
     var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -224,6 +208,10 @@ fun EditBillDialog(
                     supportingText = { amountError?.let { Text(it) } },
                     modifier = Modifier.fillMaxWidth()
                 )
+                EditDateField(
+                    selectedDate = selectedDate,
+                    onDateSelected = { selectedDate = it }
+                )
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
@@ -238,7 +226,14 @@ fun EditBillDialog(
                 if (amountCents == null) {
                     amountError = "请输入大于 0 的有效金额"
                 } else {
-                    onSave(bill.copy(category = category, amountCents = amountCents, note = noteText))
+                    onSave(
+                        bill.copy(
+                            category = category,
+                            amountCents = amountCents,
+                            date = selectedDate,
+                            note = noteText
+                        )
+                    )
                 }
             }) { Text("保存") }
         },
@@ -259,6 +254,7 @@ fun EditIncomeDialog(
     var amountText by remember { mutableStateOf(centsToYuanText(income.amountCents)) }
     var amountError by remember { mutableStateOf<String?>(null) }
     var noteText by remember { mutableStateOf(income.note) }
+    var selectedDate by remember { mutableLongStateOf(income.date) }
     var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -294,6 +290,10 @@ fun EditIncomeDialog(
                     supportingText = { amountError?.let { Text(it) } },
                     modifier = Modifier.fillMaxWidth()
                 )
+                EditDateField(
+                    selectedDate = selectedDate,
+                    onDateSelected = { selectedDate = it }
+                )
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
@@ -308,7 +308,14 @@ fun EditIncomeDialog(
                 if (amountCents == null) {
                     amountError = "请输入大于 0 的有效金额"
                 } else {
-                    onSave(income.copy(source = source, amountCents = amountCents, note = noteText))
+                    onSave(
+                        income.copy(
+                            source = source,
+                            amountCents = amountCents,
+                            date = selectedDate,
+                            note = noteText
+                        )
+                    )
                 }
             }) { Text("保存") }
         },
@@ -316,6 +323,72 @@ fun EditIncomeDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditDateField(
+    selectedDate: Long,
+    onDateSelected: (Long) -> Unit
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+
+    Column {
+        Text(
+            text = "日期",
+            fontSize = 12.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                .clickable { showDatePicker = true }
+                .padding(horizontal = 12.dp, vertical = 14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(dateFormatter.format(Date(selectedDate)), fontSize = 16.sp)
+                Icon(
+                    Icons.Default.DateRange,
+                    contentDescription = "选择日期",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        onDateSelected(it.toLocalStartOfDayMillis())
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("取消")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 data class PieSlice(val label: String, val valueCents: Long, val color: Color)

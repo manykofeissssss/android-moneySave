@@ -1,16 +1,18 @@
 package com.example.billkeeper.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -36,16 +39,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
-import com.example.billkeeper.data.model.formatCurrency
 import com.example.billkeeper.ui.screen.AddIncomeTab
 import com.example.billkeeper.ui.screen.ExpenseSummaryTab
 import com.example.billkeeper.ui.screen.ImportBillTab
 import com.example.billkeeper.ui.screen.ReminderSettingsDialog
 import com.example.billkeeper.ui.shared.BottomSummaryItem
-import com.example.billkeeper.ui.shared.DeleteConfirmDialog
 import com.example.billkeeper.ui.shared.EditBillDialog
 import com.example.billkeeper.ui.shared.EditIncomeDialog
 import com.example.billkeeper.viewmodel.LedgerViewModel
@@ -58,18 +60,26 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
 
-    val totalExp by vm.totalExpense.collectAsStateWithLifecycle(initialValue = 0L)
-    val totalInc by vm.totalIncome.collectAsStateWithLifecycle(initialValue = 0L)
+    val monthlyUiState by vm.monthlyUiState.collectAsStateWithLifecycle()
+    val monthlyExpense = monthlyUiState.totalExpenseCents
+    val monthlyIncome = monthlyUiState.totalIncomeCents
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        vm.snackbarMessage.collect { msg ->
-            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        vm.snackbarEvents.collect { event ->
+            val canUndo = event.deletedEntry != null
+            val result = snackbarHostState.showSnackbar(
+                message = event.message,
+                actionLabel = if (canUndo) "撤销" else null,
+                withDismissAction = canUndo,
+                duration = if (canUndo) SnackbarDuration.Long else SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                event.deletedEntry?.let(vm::restoreDeletedEntry)
+            }
         }
     }
 
-    var billToDelete by remember { mutableStateOf<BillItem?>(null) }
-    var incomeToDelete by remember { mutableStateOf<IncomeItem?>(null) }
     var billToEdit by remember { mutableStateOf<BillItem?>(null) }
     var incomeToEdit by remember { mutableStateOf<IncomeItem?>(null) }
     var showReminderSettings by remember { mutableStateOf(false) }
@@ -103,12 +113,12 @@ fun BillKeeperApp(vm: LedgerViewModel) {
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomSummaryItem("总收入", totalInc, Color(0xFF2E7D32))
-                    BottomSummaryItem("总支出", totalExp, Color(0xFFC62828))
+                    BottomSummaryItem("本月收入", monthlyIncome, Color(0xFF2E7D32))
+                    BottomSummaryItem("本月支出", monthlyExpense, Color(0xFFC62828))
                     BottomSummaryItem(
-                        "结余",
-                        totalInc - totalExp,
-                        if (totalInc - totalExp >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
+                        "本月结余",
+                        monthlyIncome - monthlyExpense,
+                        if (monthlyIncome - monthlyExpense >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
                     )
                 }
             }
@@ -116,6 +126,12 @@ fun BillKeeperApp(vm: LedgerViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
+            MonthSelectorBar(
+                monthLabel = monthlyUiState.monthLabel,
+                onPreviousMonth = vm::goToPreviousMonth,
+                onNextMonth = vm::goToNextMonth,
+                onCurrentMonth = vm::jumpToCurrentMonth
+            )
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
                 containerColor = Color.White,
@@ -149,31 +165,16 @@ fun BillKeeperApp(vm: LedgerViewModel) {
                     1 -> ImportBillTab(
                         vm,
                         onEditBill = { billToEdit = it },
-                        onDeleteBill = { billToDelete = it }
+                        onDeleteBill = vm::deleteBill
                     )
                     2 -> AddIncomeTab(
                         vm,
                         onEditIncome = { incomeToEdit = it },
-                        onDeleteIncome = { incomeToDelete = it }
+                        onDeleteIncome = vm::deleteIncome
                     )
                 }
             }
         }
-    }
-
-    billToDelete?.let { bill ->
-        DeleteConfirmDialog(
-            title = "${bill.category} ${formatCurrency(bill.amountCents)}",
-            onConfirm = { vm.deleteBill(bill); billToDelete = null },
-            onDismiss = { billToDelete = null }
-        )
-    }
-    incomeToDelete?.let { income ->
-        DeleteConfirmDialog(
-            title = "${income.source} ${formatCurrency(income.amountCents)}",
-            onConfirm = { vm.deleteIncome(income); incomeToDelete = null },
-            onDismiss = { incomeToDelete = null }
-        )
     }
 
     billToEdit?.let { bill ->
@@ -193,5 +194,47 @@ fun BillKeeperApp(vm: LedgerViewModel) {
 
     if (showReminderSettings) {
         ReminderSettingsDialog(onDismiss = { showReminderSettings = false })
+    }
+}
+
+@Composable
+private fun MonthSelectorBar(
+    monthLabel: String,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onCurrentMonth: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF7FAF7),
+        tonalElevation = 1.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            IconButton(
+                onClick = onPreviousMonth,
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                Icon(Icons.Default.ChevronLeft, contentDescription = "上月")
+            }
+            Text(
+                text = monthLabel,
+                modifier = Modifier.align(Alignment.Center),
+                color = Color(0xFF1B5E20),
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                IconButton(onClick = onCurrentMonth) {
+                    Icon(Icons.Default.Today, contentDescription = "回到本月")
+                }
+                IconButton(onClick = onNextMonth) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "下月")
+                }
+            }
+        }
     }
 }

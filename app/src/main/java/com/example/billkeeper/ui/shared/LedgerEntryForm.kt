@@ -196,13 +196,13 @@ fun LedgerEntryForm(
     }
 }
 
-internal fun Long.toLocalStartOfDayMillis(): Long {
+internal fun Long.toLocalStartOfDayMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
     val localDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
-    return localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    return localDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
 }
 
-private fun Long.toDatePickerUtcMillis(): Long {
-    val localDate = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
+internal fun Long.toDatePickerUtcMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
+    val localDate = Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
     return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 }
 

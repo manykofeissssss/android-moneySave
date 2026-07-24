@@ -10,6 +10,12 @@ import androidx.compose.ui.graphics.Color
 import com.example.billkeeper.BillKeeperApplication
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModelFactory
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val vm: LedgerViewModel by viewModels {
@@ -20,6 +26,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            var showSplash by remember { mutableStateOf(true) }
+
+            LaunchedEffect(Unit) {
+                delay(1500)
+                showSplash = false
+            }
+
             MaterialTheme(
                 colorScheme = lightColorScheme(
                     primary = Color(0xFF1B5E20),
@@ -28,7 +41,11 @@ class MainActivity : ComponentActivity() {
                     background = Color(0xFFFAFAFA)
                 )
             ) {
-                BillKeeperApp(vm)
+                if (showSplash) {
+                    SplashScreen()
+                } else {
+                    BillKeeperApp(vm)
+                }
             }
         }
     }

@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -39,6 +43,7 @@ import com.example.billkeeper.data.model.formatCurrency
 import com.example.billkeeper.ui.screen.AddIncomeTab
 import com.example.billkeeper.ui.screen.ExpenseSummaryTab
 import com.example.billkeeper.ui.screen.ImportBillTab
+import com.example.billkeeper.ui.screen.ReminderSettingsDialog
 import com.example.billkeeper.ui.shared.BottomSummaryItem
 import com.example.billkeeper.ui.shared.DeleteConfirmDialog
 import com.example.billkeeper.ui.shared.EditBillDialog
@@ -67,14 +72,21 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     var incomeToDelete by remember { mutableStateOf<IncomeItem?>(null) }
     var billToEdit by remember { mutableStateOf<BillItem?>(null) }
     var incomeToEdit by remember { mutableStateOf<IncomeItem?>(null) }
+    var showReminderSettings by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("💰 记账本", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { showReminderSettings = true }) {
+                        Icon(Icons.Default.Notifications, contentDescription = "提醒设置")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF1B5E20),
-                    titleContentColor = Color.White
+                    titleContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 )
             )
         },
@@ -177,5 +189,9 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             onSave = { vm.updateIncome(it); incomeToEdit = null },
             onDismiss = { incomeToEdit = null }
         )
+    }
+
+    if (showReminderSettings) {
+        ReminderSettingsDialog(onDismiss = { showReminderSettings = false })
     }
 }

@@ -72,6 +72,7 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")
 
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("com.vanniktech:android-image-cropper:4.6.0")
 
     testImplementation("junit:junit:4.13.2")
 

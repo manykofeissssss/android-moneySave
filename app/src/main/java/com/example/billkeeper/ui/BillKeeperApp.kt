@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +45,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
+import com.example.billkeeper.background.BackgroundPreferences
+import com.example.billkeeper.ui.background.AppBackground
+import com.example.billkeeper.ui.background.BackgroundSettingsDialog
 import com.example.billkeeper.ui.screen.AddIncomeTab
 import com.example.billkeeper.ui.screen.ExpenseSummaryTab
 import com.example.billkeeper.ui.screen.ImportBillTab
@@ -56,6 +61,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun BillKeeperApp(vm: LedgerViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val backgroundPreferences = remember(context) { BackgroundPreferences(context) }
+    var backgroundRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val tabs = listOf("支出总览", "记录支出", "录入收入")
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
@@ -83,12 +91,23 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     var billToEdit by remember { mutableStateOf<BillItem?>(null) }
     var incomeToEdit by remember { mutableStateOf<IncomeItem?>(null) }
     var showReminderSettings by remember { mutableStateOf(false) }
+    var showBackgroundSettings by remember { mutableStateOf(false) }
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppBackground(
+            preferences = backgroundPreferences,
+            revision = backgroundRevision,
+            modifier = Modifier.fillMaxSize()
+        )
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("小小账本", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { showBackgroundSettings = true }) {
+                        Icon(Icons.Default.Wallpaper, contentDescription = "设置背景")
+                    }
                     IconButton(onClick = { showReminderSettings = true }) {
                         Icon(Icons.Default.Notifications, contentDescription = "提醒设置")
                     }
@@ -104,7 +123,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 8.dp,
-                color = Color.White
+                color = Color.White.copy(alpha = 0.94f)
             ) {
                 Row(
                     modifier = Modifier
@@ -134,7 +153,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             )
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
-                containerColor = Color.White,
+                containerColor = Color.White.copy(alpha = 0.92f),
                 contentColor = Color(0xFF1B5E20)
             ) {
                 tabs.forEachIndexed { idx, title ->
@@ -176,6 +195,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             }
         }
     }
+    }
 
     billToEdit?.let { bill ->
         EditBillDialog(
@@ -195,6 +215,13 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     if (showReminderSettings) {
         ReminderSettingsDialog(onDismiss = { showReminderSettings = false })
     }
+    if (showBackgroundSettings) {
+        BackgroundSettingsDialog(
+            preferences = backgroundPreferences,
+            onBackgroundChanged = { backgroundRevision++ },
+            onDismiss = { showBackgroundSettings = false }
+        )
+    }
 }
 
 @Composable
@@ -206,7 +233,7 @@ private fun MonthSelectorBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF7FAF7),
+        color = Color(0xFFF7FAF7).copy(alpha = 0.92f),
         tonalElevation = 1.dp
     ) {
         Box(

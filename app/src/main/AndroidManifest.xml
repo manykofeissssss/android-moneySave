@@ -22,6 +22,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Theme.BillKeeper.Cropper" />
+
         <receiver
             android:name=".notification.ReminderReceiver"
             android:exported="false" />

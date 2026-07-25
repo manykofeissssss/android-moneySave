@@ -25,4 +25,22 @@ class ReminderSchedulerTest {
 
         assertEquals("2026-07-24T14:00:00Z", Instant.ofEpochMilli(result).toString())
     }
+
+    @Test
+    fun nextReminderTimeMillis_usesCustomHourAndMinute() {
+        val now = Instant.parse("2026-07-23T03:00:00Z").toEpochMilli()
+
+        val result = nextReminderTimeMillis(18, 35, now, zoneId)
+
+        assertEquals("2026-07-23T10:35:00Z", Instant.ofEpochMilli(result).toString())
+    }
+
+    @Test
+    fun nextReminderTimeMillis_movesExactCurrentTimeToTomorrow() {
+        val now = Instant.parse("2026-07-23T10:35:00Z").toEpochMilli()
+
+        val result = nextReminderTimeMillis(18, 35, now, zoneId)
+
+        assertEquals("2026-07-24T10:35:00Z", Instant.ofEpochMilli(result).toString())
+    }
 }

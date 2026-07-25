@@ -87,7 +87,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("💰 记账本", fontWeight = FontWeight.Bold) },
+                title = { Text("小小账本", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { showReminderSettings = true }) {
                         Icon(Icons.Default.Notifications, contentDescription = "提醒设置")

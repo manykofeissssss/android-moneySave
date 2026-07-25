@@ -1,7 +1,9 @@
 package com.example.billkeeper.ui.screen
 
 import android.Manifest
+import android.app.TimePickerDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,8 +13,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -34,9 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.billkeeper.notification.ReminderPreferences
+import com.example.billkeeper.notification.ReminderNotifications
 import com.example.billkeeper.notification.ReminderScheduler
+import com.example.billkeeper.notification.ReminderTime
 import com.example.billkeeper.notification.ReminderType
 import com.example.billkeeper.notification.canPostNotifications
+import com.example.billkeeper.notification.hasNotificationPermission
+import java.util.Locale
 
 @Composable
 fun ReminderSettingsDialog(onDismiss: () -> Unit) {
@@ -46,19 +55,30 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
     val scheduler = remember { ReminderScheduler(context) }
     var middayEnabled by remember { mutableStateOf(preferences.middayEnabled) }
     var eveningEnabled by remember { mutableStateOf(preferences.eveningEnabled) }
+    var middayTime by remember { mutableStateOf(preferences.getTime(ReminderType.MIDDAY)) }
+    var eveningTime by remember { mutableStateOf(preferences.getTime(ReminderType.EVENING)) }
     var permissionGranted by remember { mutableStateOf(canPostNotifications(context)) }
+    var exactAlarmGranted by remember { mutableStateOf(scheduler.canScheduleExactAlarms()) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        permissionGranted = granted
-        if (granted) scheduler.syncSchedules()
+        permissionGranted = canPostNotifications(context)
+        if (granted) {
+            scheduler.syncSchedules()
+            statusMessage = "通知权限已开启，可点击测试通知验证"
+        } else {
+            statusMessage = "未获得通知权限，提醒无法显示"
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 permissionGranted = canPostNotifications(context)
+                exactAlarmGranted = scheduler.canScheduleExactAlarms()
+                if (exactAlarmGranted) scheduler.syncSchedules()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -66,20 +86,51 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
     }
 
     fun requestPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !permissionGranted) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasNotificationPermission(context)
+        ) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    fun openNotificationSettings() {
+        val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        context.startActivity(settingsIntent)
+    }
+
+    fun chooseTime(type: ReminderType, current: ReminderTime) {
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                val updated = ReminderTime(hour, minute)
+                preferences.setTime(type, hour, minute)
+                when (type) {
+                    ReminderType.MIDDAY -> middayTime = updated
+                    ReminderType.EVENING -> eveningTime = updated
+                }
+                if (preferences.isEnabled(type)) scheduler.schedule(type)
+                statusMessage = "${type.displayName}已改为 ${formatReminderTime(updated)}"
+            },
+            current.hour,
+            current.minute,
+            true
+        ).show()
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("记账提醒") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 ReminderToggleRow(
-                    title = "午间提醒",
-                    time = "每天 12:00",
+                    title = "提醒一",
+                    time = middayTime,
                     checked = middayEnabled,
+                    onTimeClick = { chooseTime(ReminderType.MIDDAY, middayTime) },
                     onCheckedChange = { enabled ->
                         middayEnabled = enabled
                         preferences.middayEnabled = enabled
@@ -92,9 +143,10 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
                     }
                 )
                 ReminderToggleRow(
-                    title = "晚间提醒",
-                    time = "每天 22:00",
+                    title = "提醒二",
+                    time = eveningTime,
                     checked = eveningEnabled,
+                    onTimeClick = { chooseTime(ReminderType.EVENING, eveningTime) },
                     onCheckedChange = { enabled ->
                         eveningEnabled = enabled
                         preferences.eveningEnabled = enabled
@@ -122,14 +174,64 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
                             color = Color(0xFFC62828),
                             modifier = Modifier.weight(1f).padding(start = 8.dp)
                         )
-                        TextButton(onClick = {
-                            val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            context.startActivity(settingsIntent)
-                        }) {
+                        TextButton(onClick = ::openNotificationSettings) {
                             Text("去设置")
                         }
                     }
+                }
+
+                if (!exactAlarmGranted && (middayEnabled || eveningEnabled) &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = Color(0xFFF57C00)
+                        )
+                        Text(
+                            "尚未允许准点提醒",
+                            color = Color(0xFFF57C00),
+                            modifier = Modifier.weight(1f).padding(start = 8.dp)
+                        )
+                        TextButton(onClick = {
+                            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(intent)
+                        }) {
+                            Text("去允许")
+                        }
+                    }
+                }
+
+                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        when {
+                            !hasNotificationPermission(context) -> {
+                                requestPermissionIfNeeded()
+                                statusMessage = "请先允许通知权限"
+                            }
+                            ReminderNotifications.postTestNotification(context) -> {
+                                permissionGranted = true
+                                statusMessage = "测试通知已发送"
+                            }
+                            else -> {
+                                statusMessage = "通知或提醒渠道已关闭，请在系统设置中开启"
+                                openNotificationSettings()
+                            }
+                        }
+                    }
+                ) {
+                    Text("发送测试通知")
+                }
+
+                statusMessage?.let { message ->
+                    Text(message, color = Color.Gray)
                 }
             }
         },
@@ -142,8 +244,9 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
 @Composable
 private fun ReminderToggleRow(
     title: String,
-    time: String,
+    time: ReminderTime,
     checked: Boolean,
+    onTimeClick: () -> Unit,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -152,8 +255,20 @@ private fun ReminderToggleRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Medium)
-            Text(time, color = Color.Gray)
+            TextButton(onClick = onTimeClick) {
+                Icon(Icons.Default.Schedule, contentDescription = null)
+                Text("每天 ${formatReminderTime(time)}", modifier = Modifier.padding(start = 6.dp))
+            }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
+
+private val ReminderType.displayName: String
+    get() = when (this) {
+        ReminderType.MIDDAY -> "提醒一"
+        ReminderType.EVENING -> "提醒二"
+    }
+
+private fun formatReminderTime(time: ReminderTime): String =
+    String.format(Locale.getDefault(), "%02d:%02d", time.hour, time.minute)

@@ -3,11 +3,12 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:name=".BillKeeperApplication"
         android:allowBackup="true"
-        android:label="记账本"
+        android:label="小小账本"
         android:supportsRtl="true"
         android:theme="@style/Theme.BillKeeper">
 

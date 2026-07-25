@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import java.time.Instant
 import java.time.ZoneId
 
@@ -11,7 +12,8 @@ enum class ReminderType(
     val action: String,
     val requestCode: Int,
     val notificationId: Int,
-    val hour: Int,
+    val defaultHour: Int,
+    val defaultMinute: Int,
     val title: String,
     val message: String
 ) {
@@ -19,23 +21,27 @@ enum class ReminderType(
         action = "com.example.billkeeper.action.MIDDAY_REMINDER",
         requestCode = 1200,
         notificationId = 1200,
-        hour = 12,
-        title = "午间记账提醒",
-        message = "午餐记了吗？花一分钟补上今天的收支吧。"
+        defaultHour = 12,
+        defaultMinute = 0,
+        title = "记账提醒一",
+        message = "花一分钟补上今天的收支吧。"
     ),
     EVENING(
         action = "com.example.billkeeper.action.EVENING_REMINDER",
         requestCode = 2200,
         notificationId = 2200,
-        hour = 22,
-        title = "晚间记账提醒",
-        message = "睡前回顾一下，别忘了补全今天的账目。"
+        defaultHour = 22,
+        defaultMinute = 0,
+        title = "记账提醒二",
+        message = "回顾一下今天，别忘了补全账目。"
     );
 
     companion object {
         fun fromAction(action: String?): ReminderType? = entries.firstOrNull { it.action == action }
     }
 }
+
+data class ReminderTime(val hour: Int, val minute: Int)
 
 class ReminderScheduler(context: Context) {
     private val appContext = context.applicationContext
@@ -49,13 +55,26 @@ class ReminderScheduler(context: Context) {
     }
 
     fun schedule(type: ReminderType) {
-        val triggerAtMillis = nextReminderTimeMillis(type.hour, 0)
-        alarmManager.setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMillis,
-            pendingIntent(type)
-        )
+        val time = preferences.getTime(type)
+        val triggerAtMillis = nextReminderTimeMillis(time.hour, time.minute)
+        val operation = pendingIntent(type)
+        if (canScheduleExactAlarms()) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis,
+                operation
+            )
+        } else {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis,
+                operation
+            )
+        }
     }
+
+    fun canScheduleExactAlarms(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
     fun cancel(type: ReminderType) {
         alarmManager.cancel(pendingIntent(type))

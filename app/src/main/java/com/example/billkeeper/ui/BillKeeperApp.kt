@@ -159,7 +159,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
                 tabs.forEachIndexed { idx, title ->
                     Tab(
                         selected = pagerState.currentPage == idx,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(idx) } },
+                        onClick = { coroutineScope.launch { pagerState.scrollToPage(idx) } },
                         text = {
                             Text(
                                 title,
@@ -177,6 +177,7 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             HorizontalPager(
                 beyondBoundsPageCount = 0,
                 state = pagerState,
+                userScrollEnabled = false,
                 modifier = Modifier.weight(1f)
             ) { page ->
                 when (page) {

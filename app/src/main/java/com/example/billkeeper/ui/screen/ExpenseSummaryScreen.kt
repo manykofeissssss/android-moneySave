@@ -1,5 +1,15 @@
 package com.example.billkeeper.ui.screen
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.billkeeper.data.model.parseYuanToCents
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
@@ -52,15 +63,22 @@ import com.example.billkeeper.ui.theme.EXPENSE_CATEGORIES
 import com.example.billkeeper.ui.theme.INCOME_SOURCES
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import kotlin.math.abs
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.LinearProgressIndicator
+import com.example.billkeeper.viewmodel.BudgetProgressUi
 
 @Composable
 fun ExpenseSummaryTab(vm: LedgerViewModel) {
     val uiState by vm.monthlyUiState.collectAsStateWithLifecycle()
+    val budgetProgress by vm.monthlyBudgetProgress.collectAsStateWithLifecycle()
     var showQuickEntry by rememberSaveable { mutableStateOf(false) }
+    var showBudgetEditor by rememberSaveable { mutableStateOf(false) }
+    var budgetToDelete by rememberSaveable { mutableStateOf<String?>(null) }
     var categorySummaryExpanded by rememberSaveable { mutableStateOf(false) }
     val monthlyTotalExp = uiState.totalExpenseCents
     val monthlyTotalInc = uiState.totalIncomeCents
     val prevMonthExp = uiState.prevMonthExpenseCents
+
 
     val momChange = if (prevMonthExp > 0) monthlyTotalExp - prevMonthExp else 0L
     val momPercent = if (prevMonthExp > 0) (momChange.toDouble() / prevMonthExp) * 100 else 0.0
@@ -172,6 +190,14 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
         }
 
         item {
+            BudgetOverviewSection(
+                items = budgetProgress,
+                onAddBudget = { showBudgetEditor = true },
+                onDeleteBudget = { budgetToDelete = it }
+            )
+        }
+
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -215,6 +241,248 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             onDismiss = { showQuickEntry = false }
         )
     }
+    if (showBudgetEditor) {
+        BudgetEditorDialog(
+            onSave = vm::setBudget,
+            onDismiss = { showBudgetEditor = false }
+        )
+    }
+    budgetToDelete?.let { category ->
+        DeleteBudgetConfirmationDialog(
+            category = category,
+            onConfirm = {
+                vm.deleteBudget(category)
+                budgetToDelete = null
+            },
+            onDismiss = { budgetToDelete = null }
+        )
+    }
+}
+
+@Composable
+private fun BudgetOverviewSection(
+    items: List<BudgetProgressUi>,
+    onAddBudget: () -> Unit,
+    onDeleteBudget: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "分类预算",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${items.size} 项",
+                    color = Color.Gray,
+                    fontSize = 13.sp
+                )
+                IconButton(onClick = onAddBudget) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "设置分类预算"
+                    )
+                }
+            }
+        }
+
+        if (items.isEmpty()) {
+            Text(
+                text = "本月尚未设置预算",
+                color = Color.Gray,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        } else {
+            items.forEach { item ->
+                BudgetProgressRow(
+                    item = item,
+                    onDelete = { onDeleteBudget(item.category) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetProgressRow(
+    item: BudgetProgressUi,
+    onDelete: () -> Unit
+) {
+    val statusColor = if (item.isOverBudget) {
+        Color(0xFFC62828)
+    } else {
+        Color(0xFF2E7D32)
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = item.category,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "删除${item.category}预算",
+                    tint = Color(0xFFC62828)
+                )
+            }
+        }
+
+        Text(
+            text = "${formatCurrency(item.spentCents)} / " +
+                formatCurrency(item.limitCents),
+            color = statusColor,
+            fontSize = 13.sp
+        )
+
+        LinearProgressIndicator(
+            progress = { item.progress.coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp),
+            color = statusColor,
+            trackColor = Color(0xFFE0E0E0)
+        )
+
+        Text(
+            text = if (item.isOverBudget) {
+                "已超支 ${formatCurrency(-item.remainingCents)}"
+            } else {
+                "剩余 ${formatCurrency(item.remainingCents)}"
+            },
+            color = statusColor,
+            fontSize = 13.sp
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BudgetEditorDialog(
+    onSave: (category: String, limitCents: Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selectedCategory by rememberSaveable {
+        mutableStateOf(EXPENSE_CATEGORIES.first())
+    }
+    var amountText by rememberSaveable { mutableStateOf("") }
+    var amountError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("设置分类预算") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("支出分类") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        EXPENSE_CATEGORIES.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category) },
+                                onClick = {
+                                    selectedCategory = category
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = {
+                        amountText = it
+                        amountError = null
+                    },
+                    label = { Text("每月预算") },
+                    leadingIcon = { Text("¥") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    isError = amountError != null,
+                    supportingText = { amountError?.let { Text(it) } },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val cents = parseYuanToCents(amountText)
+                    if (cents == null) {
+                        amountError = "请输入大于 0 的有效金额"
+                    } else {
+                        onSave(selectedCategory, cents)
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteBudgetConfirmationDialog(
+    category: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("删除预算") },
+        text = { Text("确定删除本月“$category”分类的预算吗？") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("删除", color = Color(0xFFC62828))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

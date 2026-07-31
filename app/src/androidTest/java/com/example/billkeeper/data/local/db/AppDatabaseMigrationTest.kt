@@ -6,6 +6,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
+import com.example.billkeeper.data.local.entity.MonthlyBudget
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,8 +22,79 @@ class AppDatabaseMigrationTest {
     private val databaseName = "migration-test.db"
 
     @Before
-    fun createVersionOneDatabase() {
+    fun deleteExistingDatabase() {
         context.deleteDatabase(databaseName)
+    }
+
+    @After
+    fun deleteDatabase() {
+        context.deleteDatabase(databaseName)
+    }
+
+    @Test
+    fun migrationFromVersionOne_preservesRecordsAndConvertsAmountsToCents() = runBlocking {
+        createVersionOneDatabase()
+
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3
+            )
+            .build()
+
+        try {
+            database.openHelper.writableDatabase
+
+            assertEquals(
+                BillItem(id = 7, category = "餐饮", amountCents = 1235, date = 1704067200000, note = "午饭"),
+                database.billDao().getById(7)
+            )
+            assertEquals(
+                IncomeItem(id = 9, source = "工资", amountCents = 500000, date = 1704067200000, note = "一月工资"),
+                database.incomeDao().getById(9)
+            )
+            assertEquals(
+                emptyList<MonthlyBudget>(),
+                database.monthlyBudgetDao().observeByMonth(2026, 7).first()
+            )
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersionTwo_createsUsableMonthlyBudgetTable() = runBlocking {
+        createVersionTwoDatabase()
+
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_2_3)
+            .build()
+
+        val budget = MonthlyBudget(
+            year = 2026,
+            month = 7,
+            category = "餐饮",
+            limitCents = 80000
+        )
+
+        try {
+            database.openHelper.writableDatabase
+            database.monthlyBudgetDao().upsert(budget)
+
+            assertEquals(
+                listOf(budget),
+                database.monthlyBudgetDao().observeByMonth(2026, 7).first()
+            )
+            assertEquals(
+                BillItem(id = 7, category = "餐饮", amountCents = 1235, date = 1704067200000, note = "午饭"),
+                database.billDao().getById(7)
+            )
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun createVersionOneDatabase() {
         val databaseFile = context.getDatabasePath(databaseName)
         databaseFile.parentFile?.mkdirs()
 
@@ -54,30 +127,46 @@ class AppDatabaseMigrationTest {
         }
     }
 
-    @After
-    fun deleteDatabase() {
-        context.deleteDatabase(databaseName)
-    }
+    private fun createVersionTwoDatabase() {
+        val databaseFile = context.getDatabasePath(databaseName)
+        databaseFile.parentFile?.mkdirs()
 
-    @Test
-    fun migrationFromVersionOne_preservesRecordsAndConvertsAmountsToCents() = runBlocking {
-        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_1_2)
-            .build()
-
-        try {
-            database.openHelper.writableDatabase
-
-            assertEquals(
-                BillItem(id = 7, category = "餐饮", amountCents = 1235, date = 1704067200000, note = "午饭"),
-                database.billDao().getById(7)
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { database ->
+            database.execSQL(
+                """
+                CREATE TABLE bills (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    category TEXT NOT NULL,
+                    amountCents INTEGER NOT NULL,
+                    date INTEGER NOT NULL,
+                    note TEXT NOT NULL
+                )
+                """.trimIndent()
             )
-            assertEquals(
-                IncomeItem(id = 9, source = "工资", amountCents = 500000, date = 1704067200000, note = "一月工资"),
-                database.incomeDao().getById(9)
+            database.execSQL("CREATE INDEX index_bills_date ON bills(date)")
+            database.execSQL("CREATE INDEX index_bills_category ON bills(category)")
+            database.execSQL(
+                """
+                CREATE TABLE incomes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    source TEXT NOT NULL,
+                    amountCents INTEGER NOT NULL,
+                    date INTEGER NOT NULL,
+                    note TEXT NOT NULL
+                )
+                """.trimIndent()
             )
-        } finally {
-            database.close()
+            database.execSQL("CREATE INDEX index_incomes_date ON incomes(date)")
+            database.execSQL("CREATE INDEX index_incomes_source ON incomes(source)")
+            database.execSQL(
+                "INSERT INTO bills (id, category, amountCents, date, note) " +
+                    "VALUES (7, '餐饮', 1235, 1704067200000, '午饭')"
+            )
+            database.execSQL(
+                "INSERT INTO incomes (id, source, amountCents, date, note) " +
+                    "VALUES (9, '工资', 500000, 1704067200000, '一月工资')"
+            )
+            database.version = 2
         }
     }
 }

@@ -5,6 +5,7 @@ import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.model.CategorySummary
 import kotlinx.coroutines.flow.Flow
+import com.example.billkeeper.data.local.entity.MonthlyBudget
 
 class LedgerRepository(private val db: AppDatabase) {
     val allBills: Flow<List<BillItem>> = db.billDao().getAll()
@@ -27,6 +28,21 @@ class LedgerRepository(private val db: AppDatabase) {
 
     val allIncomes: Flow<List<IncomeItem>> = db.incomeDao().getAll()
     val totalIncome: Flow<Long> = db.incomeDao().getTotalIncome()
+
+    fun observeBudgetsByMonth(
+        year: Int,
+        month: Int
+    ): Flow<List<MonthlyBudget>> =
+        db.monthlyBudgetDao().observeByMonth(year, month)
+
+    suspend fun upsertBudget(budget: MonthlyBudget) =
+        db.monthlyBudgetDao().upsert(budget)
+
+    suspend fun deleteBudget(
+        year: Int,
+        month: Int,
+        category: String
+    ) = db.monthlyBudgetDao().delete(year, month, category)
 
     suspend fun insertIncome(income: IncomeItem) = db.incomeDao().insert(income)
     suspend fun updateIncome(income: IncomeItem) = db.incomeDao().update(income)

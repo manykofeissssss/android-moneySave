@@ -25,6 +25,7 @@ import java.time.YearMonth
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
+import com.example.billkeeper.data.local.entity.MonthlyBudget
 
 data class MonthlyUiState(
     val monthLabel: String,
@@ -34,6 +35,15 @@ data class MonthlyUiState(
     val totalExpenseCents: Long,
     val totalIncomeCents: Long,
     val prevMonthExpenseCents: Long
+)
+
+data class BudgetProgressUi(
+    val category: String,
+    val limitCents: Long,
+    val spentCents: Long,
+    val remainingCents: Long,
+    val progress: Float,
+    val isOverBudget: Boolean
 )
 
 sealed interface DeletedLedgerEntry {
@@ -74,6 +84,22 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         monthRangeMillis(year, month)
     }
 
+    private val selectedBudgetMonth: Flow<Pair<Int, Int>> =
+        combine(_selectedYear, _selectedMonth) { year, zeroBasedMonth ->
+            year to (zeroBasedMonth + 1)
+        }
+
+    val monthlyBudgets: StateFlow<List<MonthlyBudget>> =
+        selectedBudgetMonth
+            .flatMapLatest { (year, month) ->
+                repo.observeBudgetsByMonth(year, month)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                emptyList()
+            )
+
     private val prevMonthRange: Flow<Pair<Long, Long>> = combine(_selectedYear, _selectedMonth) { year, month ->
         val current = YearMonth.of(year, month + 1).minusMonths(1)
         monthRangeMillis(current.year, current.monthValue - 1)
@@ -90,6 +116,37 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
             }
             .sortedByDescending { it.totalCents }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyBudgetProgress: StateFlow<List<BudgetProgressUi>> =
+        combine(monthlyBudgets, monthlyCategorySummary) { budgets, categorySummary ->
+            val spentByCategory = categorySummary.associate {
+                it.category to it.totalCents
+            }
+
+            budgets.map { budget ->
+                val spentCents = spentByCategory[budget.category] ?: 0L
+                val remainingCents = budget.limitCents - spentCents
+                val progress = if (budget.limitCents > 0L) {
+                    spentCents.toFloat() / budget.limitCents
+                } else {
+                    0f
+                }
+
+                BudgetProgressUi(
+                    category = budget.category,
+                    limitCents = budget.limitCents,
+                    spentCents = spentCents,
+                    remainingCents = remainingCents,
+                    progress = progress,
+                    isOverBudget = spentCents > budget.limitCents
+                )
+            }.sortedByDescending { it.progress }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
 
     val monthlyTotalExpense: StateFlow<Long> = monthlyBills.map { bills ->
         bills.sumOf { it.amountCents }
@@ -165,6 +222,74 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
 
     private val _snackbarEvents = MutableSharedFlow<LedgerSnackbarEvent>()
     val snackbarEvents: SharedFlow<LedgerSnackbarEvent> = _snackbarEvents.asSharedFlow()
+
+    fun setBudget(
+        category: String,
+        limitCents: Long
+    ) {
+        val year = _selectedYear.value
+        val month = _selectedMonth.value + 1
+
+        viewModelScope.launch {
+            if (category.isBlank()) {
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent("请选择预算分类")
+                )
+                return@launch
+            }
+
+            if (limitCents <= 0L) {
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent("预算金额必须大于 0")
+                )
+                return@launch
+            }
+
+            try {
+                repo.upsertBudget(
+                    MonthlyBudget(
+                        year = year,
+                        month = month,
+                        category = category,
+                        limitCents = limitCents
+                    )
+                )
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent("预算已保存")
+                )
+            } catch (e: Exception) {
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent(
+                        "预算保存失败：${e.localizedMessage ?: "未知错误"}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun deleteBudget(category: String) {
+        val year = _selectedYear.value
+        val month = _selectedMonth.value + 1
+
+        viewModelScope.launch {
+            try {
+                repo.deleteBudget(
+                    year = year,
+                    month = month,
+                    category = category
+                )
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent("预算已删除")
+                )
+            } catch (e: Exception) {
+                _snackbarEvents.emit(
+                    LedgerSnackbarEvent(
+                        "预算删除失败：${e.localizedMessage ?: "未知错误"}"
+                    )
+                )
+            }
+        }
+    }
 
     fun addBill(category: String, amountCents: Long, note: String, date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {

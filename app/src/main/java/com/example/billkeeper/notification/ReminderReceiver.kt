@@ -1,6 +1,7 @@
 package com.example.billkeeper.notification
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -30,6 +31,7 @@ object ReminderNotifications {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    @SuppressLint("MissingPermission")
     fun postTestNotification(context: Context): Boolean {
         createChannel(context)
         if (!canPostNotifications(context)) return false
@@ -58,6 +60,7 @@ object ReminderNotifications {
 }
 
 class ReminderReceiver : BroadcastReceiver() {
+    @SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         val type = ReminderType.fromAction(intent.action) ?: return
         val preferences = ReminderPreferences(context)
@@ -106,10 +109,8 @@ internal fun canPostNotifications(context: Context): Boolean {
         !NotificationManagerCompat.from(context).areNotificationsEnabled()
     ) return false
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val channel = context.getSystemService(NotificationManager::class.java)
-            .getNotificationChannel(ReminderNotifications.CHANNEL_ID)
-        if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) return false
-    }
+    val channel = context.getSystemService(NotificationManager::class.java)
+        .getNotificationChannel(ReminderNotifications.CHANNEL_ID)
+    if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) return false
     return true
 }

@@ -7,6 +7,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.local.entity.MonthlyBudget
+import com.example.billkeeper.data.local.entity.RecurringEntry
+import com.example.billkeeper.domain.recurring.RecurringEntryType
+import com.example.billkeeper.domain.recurring.RecurringFrequency
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,7 +41,8 @@ class AppDatabaseMigrationTest {
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
             .addMigrations(
                 AppDatabase.MIGRATION_1_2,
-                AppDatabase.MIGRATION_2_3
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4
             )
             .build()
 
@@ -57,6 +61,10 @@ class AppDatabaseMigrationTest {
                 emptyList<MonthlyBudget>(),
                 database.monthlyBudgetDao().observeByMonth(2026, 7).first()
             )
+            assertEquals(
+                emptyList<RecurringEntry>(),
+                database.recurringEntryDao().observeAll().first()
+            )
         } finally {
             database.close()
         }
@@ -67,7 +75,10 @@ class AppDatabaseMigrationTest {
         createVersionTwoDatabase()
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_2_3)
+            .addMigrations(
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4
+            )
             .build()
 
         val budget = MonthlyBudget(
@@ -88,6 +99,58 @@ class AppDatabaseMigrationTest {
             assertEquals(
                 BillItem(id = 7, category = "餐饮", amountCents = 1235, date = 1704067200000, note = "午饭"),
                 database.billDao().getById(7)
+            )
+            assertEquals(
+                emptyList<RecurringEntry>(),
+                database.recurringEntryDao().observeAll().first()
+            )
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersionThree_createsUsableRecurringEntryTableAndPreservesData() = runBlocking {
+        createVersionThreeDatabase()
+
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_3_4)
+            .build()
+        val recurringEntry = RecurringEntry(
+            id = 11,
+            entryType = RecurringEntryType.EXPENSE,
+            categoryOrSource = "房租",
+            amountCents = 250000,
+            note = "每月房租",
+            frequency = RecurringFrequency.MONTHLY,
+            dayOfMonth = 31,
+            nextRunAt = 1788192000000,
+            createdAt = 1785513600000
+        )
+
+        try {
+            database.openHelper.writableDatabase
+            database.recurringEntryDao().upsert(recurringEntry)
+
+            assertEquals(recurringEntry, database.recurringEntryDao().getById(11))
+            assertEquals(
+                listOf(recurringEntry),
+                database.recurringEntryDao().getDueEntries(recurringEntry.nextRunAt)
+            )
+            assertEquals(
+                BillItem(id = 7, category = "餐饮", amountCents = 1235, date = 1704067200000, note = "午饭"),
+                database.billDao().getById(7)
+            )
+            assertEquals(
+                listOf(
+                    MonthlyBudget(
+                        year = 2026,
+                        month = 7,
+                        category = "餐饮",
+                        limitCents = 80000
+                    )
+                ),
+                database.monthlyBudgetDao().observeByMonth(2026, 7).first()
             )
         } finally {
             database.close()
@@ -167,6 +230,32 @@ class AppDatabaseMigrationTest {
                     "VALUES (9, '工资', 500000, 1704067200000, '一月工资')"
             )
             database.version = 2
+        }
+    }
+
+    private fun createVersionThreeDatabase() {
+        createVersionTwoDatabase()
+
+        val databaseFile = context.getDatabasePath(databaseName)
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { database ->
+            database.execSQL(
+                """
+                CREATE TABLE monthly_budgets (
+                    year INTEGER NOT NULL,
+                    month INTEGER NOT NULL,
+                    category TEXT NOT NULL,
+                    limitCents INTEGER NOT NULL,
+                    PRIMARY KEY(year, month, category)
+                )
+                """.trimIndent()
+            )
+            database.execSQL(
+                """
+                INSERT INTO monthly_budgets (year, month, category, limitCents)
+                VALUES (2026, 7, '餐饮', 80000)
+                """.trimIndent()
+            )
+            database.version = 3
         }
     }
 }

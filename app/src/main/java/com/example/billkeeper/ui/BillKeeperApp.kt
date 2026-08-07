@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,21 +55,27 @@ import com.example.billkeeper.ui.screen.AddIncomeTab
 import com.example.billkeeper.ui.screen.ExpenseSummaryTab
 import com.example.billkeeper.ui.screen.ImportBillTab
 import com.example.billkeeper.ui.screen.ReminderSettingsDialog
+import com.example.billkeeper.ui.screen.RecurringEntryScreen
 import com.example.billkeeper.ui.shared.BottomSummaryItem
 import com.example.billkeeper.ui.shared.EditBillDialog
 import com.example.billkeeper.ui.shared.EditIncomeDialog
 import com.example.billkeeper.viewmodel.LedgerViewModel
+import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun BillKeeperApp(vm: LedgerViewModel) {
+fun BillKeeperApp(
+    vm: LedgerViewModel,
+    recurringVm: RecurringEntryViewModel
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val backgroundPreferences = remember(context) { BackgroundPreferences(context) }
     var backgroundRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val tabs = listOf("支出总览", "记录支出", "录入收入")
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
+    var showRecurringEntries by rememberSaveable { mutableStateOf(false) }
 
     val monthlyUiState by vm.monthlyUiState.collectAsStateWithLifecycle()
     val monthlyExpense = monthlyUiState.totalExpenseCents
@@ -87,6 +96,11 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             }
         }
     }
+    LaunchedEffect(Unit) {
+        recurringVm.messages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     var billToEdit by remember { mutableStateOf<BillItem?>(null) }
     var incomeToEdit by remember { mutableStateOf<IncomeItem?>(null) }
@@ -103,13 +117,30 @@ fun BillKeeperApp(vm: LedgerViewModel) {
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("小小账本", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { showBackgroundSettings = true }) {
-                        Icon(Icons.Default.Wallpaper, contentDescription = "设置背景")
+                title = {
+                    Text(
+                        if (showRecurringEntries) "周期记账" else "小小账本",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    if (showRecurringEntries) {
+                        IconButton(onClick = { showRecurringEntries = false }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回账本")
+                        }
                     }
-                    IconButton(onClick = { showReminderSettings = true }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "提醒设置")
+                },
+                actions = {
+                    if (!showRecurringEntries) {
+                        IconButton(onClick = { showRecurringEntries = true }) {
+                            Icon(Icons.Default.Repeat, contentDescription = "周期记账")
+                        }
+                        IconButton(onClick = { showBackgroundSettings = true }) {
+                            Icon(Icons.Default.Wallpaper, contentDescription = "设置背景")
+                        }
+                        IconButton(onClick = { showReminderSettings = true }) {
+                            Icon(Icons.Default.Notifications, contentDescription = "提醒设置")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -120,78 +151,86 @@ fun BillKeeperApp(vm: LedgerViewModel) {
             )
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 8.dp,
-                color = Color.White.copy(alpha = 0.94f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+            if (!showRecurringEntries) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 8.dp,
+                    color = Color.White.copy(alpha = 0.94f)
                 ) {
-                    BottomSummaryItem("本月收入", monthlyIncome, Color(0xFF2E7D32))
-                    BottomSummaryItem("本月支出", monthlyExpense, Color(0xFFC62828))
-                    BottomSummaryItem(
-                        "本月结余",
-                        monthlyIncome - monthlyExpense,
-                        if (monthlyIncome - monthlyExpense >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BottomSummaryItem("本月收入", monthlyIncome, Color(0xFF2E7D32))
+                        BottomSummaryItem("本月支出", monthlyExpense, Color(0xFFC62828))
+                        BottomSummaryItem(
+                            "本月结余",
+                            monthlyIncome - monthlyExpense,
+                            if (monthlyIncome - monthlyExpense >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
+                        )
+                    }
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            MonthSelectorBar(
-                monthLabel = monthlyUiState.monthLabel,
-                onPreviousMonth = vm::goToPreviousMonth,
-                onNextMonth = vm::goToNextMonth,
-                onCurrentMonth = vm::jumpToCurrentMonth
-            )
-            TabRow(
-                selectedTabIndex = pagerState.currentPage,
-                containerColor = Color.White.copy(alpha = 0.92f),
-                contentColor = Color(0xFF1B5E20)
-            ) {
-                tabs.forEachIndexed { idx, title ->
-                    Tab(
-                        selected = pagerState.currentPage == idx,
-                        onClick = { coroutineScope.launch { pagerState.scrollToPage(idx) } },
-                        text = {
-                            Text(
-                                title,
-                                fontWeight = if (pagerState.currentPage == idx) {
-                                    FontWeight.Bold
-                                } else {
-                                    FontWeight.Normal
-                                }
-                            )
-                        }
-                    )
-                }
+        if (showRecurringEntries) {
+            Box(modifier = Modifier.padding(padding)) {
+                RecurringEntryScreen(recurringVm)
             }
+        } else {
+            Column(modifier = Modifier.padding(padding)) {
+                MonthSelectorBar(
+                    monthLabel = monthlyUiState.monthLabel,
+                    onPreviousMonth = vm::goToPreviousMonth,
+                    onNextMonth = vm::goToNextMonth,
+                    onCurrentMonth = vm::jumpToCurrentMonth
+                )
+                TabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    containerColor = Color.White.copy(alpha = 0.92f),
+                    contentColor = Color(0xFF1B5E20)
+                ) {
+                    tabs.forEachIndexed { idx, title ->
+                        Tab(
+                            selected = pagerState.currentPage == idx,
+                            onClick = { coroutineScope.launch { pagerState.scrollToPage(idx) } },
+                            text = {
+                                Text(
+                                    title,
+                                    fontWeight = if (pagerState.currentPage == idx) {
+                                        FontWeight.Bold
+                                    } else {
+                                        FontWeight.Normal
+                                    }
+                                )
+                            }
+                        )
+                    }
+                }
 
-            HorizontalPager(
-                beyondBoundsPageCount = 0,
-                state = pagerState,
-                userScrollEnabled = false,
-                modifier = Modifier.weight(1f)
-            ) { page ->
-                when (page) {
-                    0 -> ExpenseSummaryTab(vm)
-                    1 -> ImportBillTab(
-                        vm,
-                        onEditBill = { billToEdit = it },
-                        onDeleteBill = vm::deleteBill
-                    )
-                    2 -> AddIncomeTab(
-                        vm,
-                        onEditIncome = { incomeToEdit = it },
-                        onDeleteIncome = vm::deleteIncome
-                    )
+                HorizontalPager(
+                    beyondBoundsPageCount = 0,
+                    state = pagerState,
+                    userScrollEnabled = false,
+                    modifier = Modifier.weight(1f)
+                ) { page ->
+                    when (page) {
+                        0 -> ExpenseSummaryTab(vm)
+                        1 -> ImportBillTab(
+                            vm,
+                            onEditBill = { billToEdit = it },
+                            onDeleteBill = vm::deleteBill
+                        )
+                        2 -> AddIncomeTab(
+                            vm,
+                            onEditIncome = { incomeToEdit = it },
+                            onDeleteIncome = vm::deleteIncome
+                        )
+                    }
                 }
             }
         }

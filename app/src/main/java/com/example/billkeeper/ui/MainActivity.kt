@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.Color
 import com.example.billkeeper.BillKeeperApplication
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModelFactory
+import com.example.billkeeper.viewmodel.RecurringEntryViewModel
+import com.example.billkeeper.viewmodel.RecurringEntryViewModelFactory
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +22,10 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private val vm: LedgerViewModel by viewModels {
         LedgerViewModelFactory((application as BillKeeperApplication).repository)
+    }
+    private val recurringVm: RecurringEntryViewModel by viewModels {
+        val app = application as BillKeeperApplication
+        RecurringEntryViewModelFactory(app.repository, app.recurringScheduler)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,7 +50,7 @@ class MainActivity : ComponentActivity() {
                 if (showSplash) {
                     SplashScreen()
                 } else {
-                    BillKeeperApp(vm)
+                    BillKeeperApp(vm, recurringVm)
                 }
             }
         }

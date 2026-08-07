@@ -1,11 +1,14 @@
 package com.example.billkeeper.data.repository
 
+import androidx.room.withTransaction
 import com.example.billkeeper.data.local.db.AppDatabase
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
-import com.example.billkeeper.data.model.CategorySummary
-import kotlinx.coroutines.flow.Flow
 import com.example.billkeeper.data.local.entity.MonthlyBudget
+import com.example.billkeeper.data.local.entity.RecurringEntry
+import com.example.billkeeper.data.model.CategorySummary
+import com.example.billkeeper.domain.recurring.RecurringEntryType
+import kotlinx.coroutines.flow.Flow
 
 class LedgerRepository(private val db: AppDatabase) {
     val allBills: Flow<List<BillItem>> = db.billDao().getAll()
@@ -54,4 +57,61 @@ class LedgerRepository(private val db: AppDatabase) {
 
     fun getTotalIncomeByMonth(startMs: Long, endMs: Long): Flow<Long> =
         db.incomeDao().getTotalIncomeByMonth(startMs, endMs)
+
+    val recurringEntries: Flow<List<RecurringEntry>> = db.recurringEntryDao().observeAll()
+
+    suspend fun getRecurringEntryById(id: Int): RecurringEntry? =
+        db.recurringEntryDao().getById(id)
+
+    suspend fun getDueRecurringEntries(nowMillis: Long): List<RecurringEntry> =
+        db.recurringEntryDao().getDueEntries(nowMillis)
+
+    suspend fun upsertRecurringEntry(entry: RecurringEntry) =
+        db.recurringEntryDao().upsert(entry)
+
+    suspend fun deleteRecurringEntry(id: Int) =
+        db.recurringEntryDao().deleteById(id)
+
+    suspend fun executeRecurringOccurrences(
+        entryId: Int,
+        expectedNextRunAt: Long,
+        occurrenceTimes: List<Long>,
+        nextRunAt: Long
+    ): Boolean = db.withTransaction {
+        val entry = db.recurringEntryDao().getById(entryId)
+            ?: return@withTransaction false
+        if (!entry.enabled || entry.nextRunAt != expectedNextRunAt || occurrenceTimes.isEmpty()) {
+            return@withTransaction false
+        }
+
+        occurrenceTimes.forEach { occurrenceTime ->
+            when (entry.entryType) {
+                RecurringEntryType.EXPENSE -> db.billDao().insert(
+                    BillItem(
+                        category = entry.categoryOrSource,
+                        amountCents = entry.amountCents,
+                        date = occurrenceTime,
+                        note = entry.note
+                    )
+                )
+
+                RecurringEntryType.INCOME -> db.incomeDao().insert(
+                    IncomeItem(
+                        source = entry.categoryOrSource,
+                        amountCents = entry.amountCents,
+                        date = occurrenceTime,
+                        note = entry.note
+                    )
+                )
+            }
+        }
+
+        db.recurringEntryDao().upsert(
+            entry.copy(
+                nextRunAt = nextRunAt,
+                lastExecutedAt = occurrenceTimes.last()
+            )
+        )
+        true
+    }
 }

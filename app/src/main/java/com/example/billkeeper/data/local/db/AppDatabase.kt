@@ -2,30 +2,34 @@ package com.example.billkeeper.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.billkeeper.data.local.dao.BillDao
 import com.example.billkeeper.data.local.dao.IncomeDao
+import com.example.billkeeper.data.local.dao.MonthlyBudgetDao
+import com.example.billkeeper.data.local.dao.RecurringEntryDao
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
-import com.example.billkeeper.data.local.dao.MonthlyBudgetDao
 import com.example.billkeeper.data.local.entity.MonthlyBudget
-
+import com.example.billkeeper.data.local.entity.RecurringEntry
 
 @Database(
     entities = [
         BillItem::class,
         IncomeItem::class,
-        MonthlyBudget::class
+        MonthlyBudget::class,
+        RecurringEntry::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
+@TypeConverters(RecurringEntryConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun billDao(): BillDao
     abstract fun incomeDao(): IncomeDao
-
     abstract fun monthlyBudgetDao(): MonthlyBudgetDao
+    abstract fun recurringEntryDao(): RecurringEntryDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -92,5 +96,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS recurring_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        entryType TEXT NOT NULL,
+                        categoryOrSource TEXT NOT NULL,
+                        amountCents INTEGER NOT NULL,
+                        note TEXT NOT NULL,
+                        frequency TEXT NOT NULL,
+                        dayOfWeek INTEGER,
+                        dayOfMonth INTEGER,
+                        nextRunAt INTEGER NOT NULL,
+                        lastExecutedAt INTEGER,
+                        enabled INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_recurring_entries_enabled_nextRunAt
+                    ON recurring_entries(enabled, nextRunAt)
+                    """.trimIndent()
+                )
+            }
+        }
     }
 }

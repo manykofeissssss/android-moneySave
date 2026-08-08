@@ -72,7 +72,7 @@ fun BillKeeperApp(
     val context = androidx.compose.ui.platform.LocalContext.current
     val backgroundPreferences = remember(context) { BackgroundPreferences(context) }
     var backgroundRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    val tabs = listOf("支出总览", "记录支出", "录入收入")
+    val tabs = remember { listOf("支出总览", "记录支出", "录入收入") }
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
     var showRecurringEntries by rememberSaveable { mutableStateOf(false) }
@@ -213,9 +213,10 @@ fun BillKeeperApp(
                 }
 
                 HorizontalPager(
-                    beyondBoundsPageCount = 0,
+                    beyondBoundsPageCount = 1,
                     state = pagerState,
-                    userScrollEnabled = false,
+                    key = { page -> page },
+                    userScrollEnabled = true,
                     modifier = Modifier.weight(1f)
                 ) { page ->
                     when (page) {

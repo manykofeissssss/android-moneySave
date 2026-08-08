@@ -399,7 +399,10 @@ fun PieChart(
     modifier: Modifier = Modifier,
     title: String = ""
 ) {
-    val totalCents = slices.sumOf { it.valueCents }
+    val totalCents = remember(slices) { slices.sumOf { it.valueCents } }
+    val legendRows = remember(slices) {
+        slices.sortedByDescending { it.valueCents }.chunked(2)
+    }
     if (totalCents <= 0 || slices.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text("暂无数据", color = Color.Gray, fontSize = 14.sp)
@@ -442,7 +445,7 @@ fun PieChart(
 
         Spacer(Modifier.height(12.dp))
 
-        slices.sortedByDescending { it.valueCents }.chunked(2).forEach { row ->
+        legendRows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly

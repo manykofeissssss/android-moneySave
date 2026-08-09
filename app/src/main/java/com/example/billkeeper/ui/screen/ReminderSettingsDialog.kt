@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -231,7 +232,7 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
                 }
 
                 statusMessage?.let { message ->
-                    Text(message, color = Color.Gray)
+                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },

@@ -1,5 +1,6 @@
 package com.example.billkeeper.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -49,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.background.BackgroundPreferences
+import com.example.billkeeper.background.AppearancePreferences
+import com.example.billkeeper.background.AppearanceSettings
 import com.example.billkeeper.ui.background.AppBackground
 import com.example.billkeeper.ui.background.BackgroundSettingsDialog
 import com.example.billkeeper.ui.screen.AddIncomeTab
@@ -67,7 +71,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun BillKeeperApp(
     vm: LedgerViewModel,
-    recurringVm: RecurringEntryViewModel
+    recurringVm: RecurringEntryViewModel,
+    appearanceSettings: AppearanceSettings,
+    appearancePreferences: AppearancePreferences,
+    darkTheme: Boolean
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val backgroundPreferences = remember(context) { BackgroundPreferences(context) }
@@ -76,6 +83,10 @@ fun BillKeeperApp(
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
     var showRecurringEntries by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = showRecurringEntries) {
+        showRecurringEntries = false
+    }
 
     val monthlyUiState by vm.monthlyUiState.collectAsStateWithLifecycle()
     val monthlyExpense = monthlyUiState.totalExpenseCents
@@ -110,6 +121,8 @@ fun BillKeeperApp(
     Box(modifier = Modifier.fillMaxSize()) {
         AppBackground(
             preferences = backgroundPreferences,
+            settings = appearanceSettings,
+            darkTheme = darkTheme,
             revision = backgroundRevision,
             modifier = Modifier.fillMaxSize()
         )
@@ -144,9 +157,10 @@ fun BillKeeperApp(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1B5E20),
-                    titleContentColor = Color.White,
-                    actionIconContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
@@ -155,7 +169,7 @@ fun BillKeeperApp(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shadowElevation = 8.dp,
-                    color = Color.White.copy(alpha = 0.94f)
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                 ) {
                     Row(
                         modifier = Modifier
@@ -191,8 +205,8 @@ fun BillKeeperApp(
                 )
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
-                    containerColor = Color.White.copy(alpha = 0.92f),
-                    contentColor = Color(0xFF1B5E20)
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
                     tabs.forEachIndexed { idx, title ->
                         Tab(
@@ -259,6 +273,9 @@ fun BillKeeperApp(
     if (showBackgroundSettings) {
         BackgroundSettingsDialog(
             preferences = backgroundPreferences,
+            appearancePreferences = appearancePreferences,
+            settings = appearanceSettings,
+            darkTheme = darkTheme,
             onBackgroundChanged = { backgroundRevision++ },
             onDismiss = { showBackgroundSettings = false }
         )
@@ -274,7 +291,7 @@ private fun MonthSelectorBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF7FAF7).copy(alpha = 0.92f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         tonalElevation = 1.dp
     ) {
         Box(
@@ -291,7 +308,7 @@ private fun MonthSelectorBar(
             Text(
                 text = monthLabel,
                 modifier = Modifier.align(Alignment.Center),
-                color = Color(0xFF1B5E20),
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )

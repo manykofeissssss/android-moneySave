@@ -37,6 +37,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -95,7 +96,7 @@ fun RecurringEntryScreen(vm: RecurringEntryViewModel) {
                 text = "周期计划",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF263238)
+                color = MaterialTheme.colorScheme.onBackground
             )
             Row {
                 IconButton(onClick = vm::runDueEntriesNow) {
@@ -119,7 +120,7 @@ fun RecurringEntryScreen(vm: RecurringEntryViewModel) {
                         tint = Color(0xFF78909C)
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("暂无周期记账", color = Color(0xFF607D8B))
+                    Text("暂无周期记账", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -191,7 +192,7 @@ private fun RecurringEntryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.96f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -235,12 +236,12 @@ private fun RecurringEntryCard(
                 Spacer(Modifier.height(5.dp))
                 Text(
                     text = "${entry.scheduleLabel()} · 下次 ${entry.nextRunLabel()}",
-                    color = Color(0xFF546E7A),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
                 if (entry.note.isNotBlank()) {
                     Spacer(Modifier.height(3.dp))
-                    Text(entry.note, color = Color.Gray, fontSize = 13.sp)
+                    Text(entry.note, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),

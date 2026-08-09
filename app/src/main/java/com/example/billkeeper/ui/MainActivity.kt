@@ -4,10 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.billkeeper.BillKeeperApplication
+import com.example.billkeeper.background.AppearancePreferences
+import com.example.billkeeper.background.BackgroundStyle
+import com.example.billkeeper.ui.theme.BillKeeperTheme
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModelFactory
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
@@ -20,6 +22,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private val appearancePreferences by lazy { AppearancePreferences(applicationContext) }
     private val vm: LedgerViewModel by viewModels {
         LedgerViewModelFactory((application as BillKeeperApplication).repository)
     }
@@ -33,24 +36,33 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var showSplash by remember { mutableStateOf(true) }
+            val appearanceSettings by appearancePreferences.settings.collectAsStateWithLifecycle(
+                initialValue = appearancePreferences.initialSettings
+            )
+            val darkTheme = isSystemInDarkTheme()
 
             LaunchedEffect(Unit) {
                 delay(1500)
                 showSplash = false
             }
 
-            MaterialTheme(
-                colorScheme = lightColorScheme(
-                    primary = Color(0xFF1B5E20),
-                    secondary = Color(0xFF2E7D32),
-                    surface = Color(0xFFF5F5F5),
-                    background = Color(0xFFFAFAFA)
-                )
+            BillKeeperTheme(
+                darkTheme = darkTheme,
+                themeSeedArgb = appearanceSettings.themeSeedArgb.takeUnless { darkTheme },
+                backgroundColorArgb = appearanceSettings.backgroundColorArgb.takeIf {
+                    !darkTheme && appearanceSettings.backgroundStyle == BackgroundStyle.SOLID_COLOR
+                }
             ) {
                 if (showSplash) {
                     SplashScreen()
                 } else {
-                    BillKeeperApp(vm, recurringVm)
+                    BillKeeperApp(
+                        vm = vm,
+                        recurringVm = recurringVm,
+                        appearanceSettings = appearanceSettings,
+                        appearancePreferences = appearancePreferences,
+                        darkTheme = darkTheme
+                    )
                 }
             }
         }

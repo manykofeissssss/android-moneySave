@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,13 +39,14 @@ fun AddIncomeTab(
     onDeleteIncome: (IncomeItem) -> Unit
 ) {
     val incomes by vm.monthlyIncomes.collectAsStateWithLifecycle()
-    val pieSlices = remember(incomes) {
+    val fallbackColor = MaterialTheme.colorScheme.outline
+    val pieSlices = remember(incomes, fallbackColor) {
         incomes.groupBy { it.source }
             .map { (source, entries) ->
                 PieSlice(
                     label = source,
                     valueCents = entries.sumOf { it.amountCents },
-                    color = INCOME_COLORS[source] ?: Color.Gray
+                    color = INCOME_COLORS[source] ?: fallbackColor
                 )
             }
             .filter { it.valueCents > 0 }
@@ -72,7 +74,7 @@ fun AddIncomeTab(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     PieChart(
                         slices = pieSlices,
@@ -88,7 +90,7 @@ fun AddIncomeTab(
         }
 
         if (incomes.isEmpty()) {
-            item { Text("还没有收入记录", color = Color.Gray, modifier = Modifier.padding(vertical = 16.dp)) }
+            item { Text("还没有收入记录", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 16.dp)) }
         } else {
             items(incomes, key = { it.id }) { income ->
                 IncomeRow(income = income, onEdit = onEditIncome, onDelete = onDeleteIncome)

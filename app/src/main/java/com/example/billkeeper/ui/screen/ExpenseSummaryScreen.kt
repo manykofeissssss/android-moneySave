@@ -65,6 +65,7 @@ import com.example.billkeeper.viewmodel.LedgerViewModel
 import kotlin.math.abs
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import com.example.billkeeper.viewmodel.BudgetProgressUi
 
 @Composable
@@ -91,17 +92,17 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("月度支出", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                    Text("月度支出", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), fontSize = 14.sp)
                     Text(
                         formatCurrency(monthlyTotalExp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 36.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -111,13 +112,13 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                     ) {
                         Text(
                             "共 ${uiState.bills.size} 笔",
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                             fontSize = 13.sp
                         )
                         if (monthlyTotalInc > 0) {
                             Text(
                                 "  |  收入 ${formatCurrency(monthlyTotalInc)}",
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                                 fontSize = 13.sp
                             )
                         }
@@ -142,14 +143,14 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("较上月", fontSize = 14.sp, color = Color.Gray)
+                        Text("较上月", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val arrow = if (momChange > 0) "↑" else if (momChange < 0) "↓" else "→"
                             val changeColor = if (momChange > 0) {
@@ -157,7 +158,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                             } else if (momChange < 0) {
                                 Color(0xFF2E7D32)
                             } else {
-                                Color.Gray
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             }
                             Text(
                                 "$arrow ${formatCurrency(abs(momChange))}",
@@ -181,7 +182,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 onClick = { showQuickEntry = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B5E20))
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -210,7 +211,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "${uiState.categorySummary.size} 类",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                     Icon(
@@ -220,7 +221,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                             Icons.Default.ExpandMore
                         },
                         contentDescription = if (categorySummaryExpanded) "收起分类汇总" else "展开分类汇总",
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -228,7 +229,7 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
 
         if (categorySummaryExpanded) {
             if (uiState.categorySummary.isEmpty()) {
-                item { Text("暂无支出记录", color = Color.Gray, modifier = Modifier.padding(vertical = 20.dp)) }
+                item { Text("暂无支出记录", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp)) }
             } else {
                 items(uiState.categorySummary, key = { it.category }) { cat -> CategoryRow(cat) }
             }
@@ -282,7 +283,7 @@ private fun BudgetOverviewSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${items.size} 项",
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
                 IconButton(onClick = onAddBudget) {
@@ -297,7 +298,7 @@ private fun BudgetOverviewSection(
         if (items.isEmpty()) {
             Text(
                 text = "本月尚未设置预算",
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {
@@ -520,10 +521,11 @@ private fun QuickEntrySheet(
 
             if (selectedType == 0) {
                 LedgerEntryForm(
-                    title = "记录支出",
+                    title = "今日支出",
                     optionLabel = "类别",
                     options = EXPENSE_CATEGORIES,
                     actionColor = Color(0xFFC62828),
+                    allowDateSelection = false,
                     onSubmit = { category, amountCents, note, date ->
                         vm.addBill(category, amountCents, note, date)
                         onDismiss()
@@ -531,10 +533,11 @@ private fun QuickEntrySheet(
                 )
             } else {
                 LedgerEntryForm(
-                    title = "记录收入",
+                    title = "今日收入",
                     optionLabel = "来源",
                     options = INCOME_SOURCES,
                     actionColor = Color(0xFF2E7D32),
+                    allowDateSelection = false,
                     onSubmit = { source, amountCents, note, date ->
                         vm.addIncome(source, amountCents, note, date)
                         onDismiss()

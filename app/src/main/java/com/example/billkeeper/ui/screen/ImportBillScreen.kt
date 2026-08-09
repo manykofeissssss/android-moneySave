@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,13 +39,14 @@ fun ImportBillTab(
     onDeleteBill: (BillItem) -> Unit
 ) {
     val bills by vm.monthlyBills.collectAsStateWithLifecycle()
-    val pieSlices = remember(bills) {
+    val fallbackColor = MaterialTheme.colorScheme.outline
+    val pieSlices = remember(bills, fallbackColor) {
         bills.groupBy { it.category }
             .map { (category, entries) ->
                 PieSlice(
                     label = category,
                     valueCents = entries.sumOf { it.amountCents },
-                    color = CATEGORY_COLORS[category] ?: Color.Gray
+                    color = CATEGORY_COLORS[category] ?: fallbackColor
                 )
             }
             .filter { it.valueCents > 0 }
@@ -72,7 +74,7 @@ fun ImportBillTab(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     PieChart(
                         slices = pieSlices,
@@ -88,7 +90,7 @@ fun ImportBillTab(
         }
 
         if (bills.isEmpty()) {
-            item { Text("还没有账单", color = Color.Gray, modifier = Modifier.padding(vertical = 16.dp)) }
+            item { Text("还没有账单", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 16.dp)) }
         } else {
             items(bills, key = { it.id }) { bill ->
                 BillRow(bill = bill, onEdit = onEditBill, onDelete = onDeleteBill)

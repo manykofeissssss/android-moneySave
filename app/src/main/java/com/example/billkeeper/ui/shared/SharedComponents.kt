@@ -32,6 +32,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,14 +66,14 @@ import java.util.Locale
 @Composable
 fun BottomSummaryItem(label: String, amountCents: Long, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(formatCurrency(amountCents), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = color)
     }
 }
 
 @Composable
 fun CategoryRow(cat: CategorySummary) {
-    val color = CATEGORY_COLORS[cat.category] ?: Color.Gray
+    val color = CATEGORY_COLORS[cat.category] ?: MaterialTheme.colorScheme.outline
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -100,7 +101,7 @@ fun BillRow(
     onEdit: (BillItem) -> Unit,
     onDelete: (BillItem) -> Unit
 ) {
-    val color = CATEGORY_COLORS[bill.category] ?: Color.Gray
+    val color = CATEGORY_COLORS[bill.category] ?: MaterialTheme.colorScheme.outline
     val df = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
         Row(
@@ -113,13 +114,13 @@ fun BillRow(
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(bill.category, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                if (bill.note.isNotBlank()) Text(bill.note, fontSize = 12.sp, color = Color.Gray)
-                Text(df.format(Date(bill.date)), fontSize = 11.sp, color = Color.LightGray)
+                if (bill.note.isNotBlank()) Text(bill.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(df.format(Date(bill.date)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
             Text("- ${formatCurrency(bill.amountCents)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = { onEdit(bill) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = { onDelete(bill) }, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color(0xFFC62828), modifier = Modifier.size(18.dp))
@@ -146,13 +147,13 @@ fun IncomeRow(
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(income.source, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                if (income.note.isNotBlank()) Text(income.note, fontSize = 12.sp, color = Color.Gray)
-                Text(df.format(Date(income.date)), fontSize = 11.sp, color = Color.LightGray)
+                if (income.note.isNotBlank()) Text(income.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(df.format(Date(income.date)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
             Text("+ ${formatCurrency(income.amountCents)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = { onEdit(income) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = { onDelete(income) }, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color(0xFFC62828), modifier = Modifier.size(18.dp))
@@ -338,13 +339,13 @@ private fun EditDateField(
         Text(
             text = "日期",
             fontSize = 12.sp,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
                 .clickable { showDatePicker = true }
                 .padding(horizontal = 12.dp, vertical = 14.dp)
         ) {
@@ -357,7 +358,7 @@ private fun EditDateField(
                 Icon(
                     Icons.Default.DateRange,
                     contentDescription = "选择日期",
-                    tint = Color.Gray,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -400,12 +401,13 @@ fun PieChart(
     title: String = ""
 ) {
     val totalCents = remember(slices) { slices.sumOf { it.valueCents } }
+    val holeColor = MaterialTheme.colorScheme.surface
     val legendRows = remember(slices) {
         slices.sortedByDescending { it.valueCents }.chunked(2)
     }
     if (totalCents <= 0 || slices.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text("暂无数据", color = Color.Gray, fontSize = 14.sp)
+            Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         }
         return
     }
@@ -432,14 +434,14 @@ fun PieChart(
                     startAngle += sweep
                 }
                 drawCircle(
-                    color = Color.White,
+                    color = holeColor,
                     radius = canvasSize.minDimension * 0.32f,
                     center = canvasCenter
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(formatCurrency(totalCents), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
-                Text("合计", fontSize = 11.sp, color = Color.Gray)
+            Text(formatCurrency(totalCents), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("合计", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -461,8 +463,8 @@ fun PieChart(
                                 .background(slice.color, RoundedCornerShape(2.dp))
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text(slice.label, fontSize = 12.sp, color = Color.DarkGray, modifier = Modifier.weight(1f))
-                        Text(pct, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                        Text(slice.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Text(pct, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 if (row.size == 1) {

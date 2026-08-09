@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,11 +63,12 @@ fun LedgerEntryForm(
     optionLabel: String,
     options: List<String>,
     actionColor: Color,
+    allowDateSelection: Boolean = true,
     onSubmit: (option: String, amountCents: Long, note: String, date: Long) -> Unit
 ) {
     require(options.isNotEmpty()) { "Entry options must not be empty." }
 
-    var selectedOption by remember { mutableStateOf(options.first()) }
+    var selectedOption by remember(options) { mutableStateOf(options.first()) }
     var amountText by remember { mutableStateOf("") }
     var amountError by remember { mutableStateOf<String?>(null) }
     var noteText by remember { mutableStateOf("") }
@@ -81,24 +83,24 @@ fun LedgerEntryForm(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
 
-            Text(optionLabel, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+            Text(optionLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor()
-                        .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
                         .padding(horizontal = 12.dp, vertical = 14.dp)
                 ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(selectedOption, fontSize = 16.sp)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -126,22 +128,24 @@ fun LedgerEntryForm(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(8.dp))
-            Text("日期", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
-                    .clickable { showDatePicker = true }
-                    .padding(horizontal = 12.dp, vertical = 14.dp)
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(selectedDateText, fontSize = 16.sp)
+            if (allowDateSelection) {
+                Spacer(Modifier.height(8.dp))
+                Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+                        .clickable { showDatePicker = true }
+                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(selectedDateText, fontSize = 16.sp)
+                        }
+                        Icon(Icons.Default.Edit, contentDescription = "选择日期", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
-                    Icon(Icons.Default.Edit, contentDescription = "选择日期", tint = Color.Gray, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -160,7 +164,8 @@ fun LedgerEntryForm(
                     if (amountCents == null) {
                         amountError = "请输入大于 0 的有效金额"
                     } else {
-                        onSubmit(selectedOption, amountCents, noteText.trim(), selectedDate)
+                        val entryDate = if (allowDateSelection) selectedDate else System.currentTimeMillis()
+                        onSubmit(selectedOption, amountCents, noteText.trim(), entryDate)
                         amountText = ""
                         noteText = ""
                         selectedDate = todayStartOfDayMillis()
@@ -177,7 +182,7 @@ fun LedgerEntryForm(
         }
     }
 
-    if (showDatePicker) {
+    if (allowDateSelection && showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis())
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },

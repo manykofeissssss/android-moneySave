@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.billkeeper.BillKeeperApplication
 import com.example.billkeeper.background.AppearancePreferences
 import com.example.billkeeper.background.BackgroundStyle
@@ -14,12 +15,10 @@ import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModelFactory
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import com.example.billkeeper.viewmodel.RecurringEntryViewModelFactory
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.saveable.rememberSaveable
 
 class MainActivity : ComponentActivity() {
     private val appearancePreferences by lazy { AppearancePreferences(applicationContext) }
@@ -32,19 +31,15 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         setContent {
-            var showSplash by remember { mutableStateOf(true) }
+            var showSplash by rememberSaveable { mutableStateOf(true) }
             val appearanceSettings by appearancePreferences.settings.collectAsStateWithLifecycle(
                 initialValue = appearancePreferences.initialSettings
             )
             val darkTheme = isSystemInDarkTheme()
-
-            LaunchedEffect(Unit) {
-                delay(1500)
-                showSplash = false
-            }
 
             BillKeeperTheme(
                 darkTheme = darkTheme,
@@ -54,7 +49,7 @@ class MainActivity : ComponentActivity() {
                 }
             ) {
                 if (showSplash) {
-                    SplashScreen()
+                    SplashScreen(onFinish = { showSplash = false })
                 } else {
                     BillKeeperApp(
                         vm = vm,

@@ -22,6 +22,8 @@ import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 data class RecurringEntryDraft(
     val id: Int = 0,
@@ -30,7 +32,9 @@ data class RecurringEntryDraft(
     val amountCents: Long,
     val note: String,
     val frequency: RecurringFrequency,
-    val selectedDay: Int
+    val selectedDay: Int,
+    val executionHour: Int,
+    val executionMinute: Int
 )
 
 class RecurringEntryViewModel(
@@ -54,6 +58,8 @@ class RecurringEntryViewModel(
                 require(categoryOrSource.isNotEmpty()) { "请选择分类或来源" }
                 require(draft.amountCents > 0) { "金额必须大于 0" }
                 validateSelectedDay(draft.frequency, draft.selectedDay)
+                require(draft.executionHour in 0..23) { "执行小时必须在 0 到 23 之间" }
+                require(draft.executionMinute in 0..59) { "执行分钟必须在 0 到 59 之间" }
 
                 val existing = draft.id.takeIf { it != 0 }
                     ?.let { repository.getRecurringEntryById(it) }
@@ -80,7 +86,9 @@ class RecurringEntryViewModel(
                         nextRunAt = nextRunAt,
                         lastExecutedAt = existing?.lastExecutedAt,
                         enabled = existing?.enabled ?: true,
-                        createdAt = existing?.createdAt ?: now
+                        createdAt = existing?.createdAt ?: now,
+                        executionHour = draft.executionHour,
+                        executionMinute = draft.executionMinute
                     )
                 )
                 scheduler.enqueueImmediateCheck()
@@ -135,21 +143,28 @@ class RecurringEntryViewModel(
         lastExecutedAt: Long?
     ): Long {
         val schedule = draft.toSchedule()
-        val today = LocalDate.now(clock)
+        val now = LocalDateTime.now(clock)
+        val today = now.toLocalDate()
         var firstDate = occurrenceOnOrAfter(schedule, today)
+        val executionTime = LocalTime.of(draft.executionHour, draft.executionMinute)
+        if (firstDate == today && !now.toLocalTime().isBefore(executionTime)) {
+            firstDate = nextOccurrenceAfter(schedule, firstDate)
+        }
         val lastExecutedDate = lastExecutedAt?.let {
             Instant.ofEpochMilli(it).atZone(clock.zone).toLocalDate()
         }
         if (lastExecutedDate == firstDate) {
             firstDate = nextOccurrenceAfter(schedule, firstDate)
         }
-        return firstDate.atStartOfDay(clock.zone).toInstant().toEpochMilli()
+        return firstDate.atTime(executionTime).atZone(clock.zone).toInstant().toEpochMilli()
     }
 
     private fun RecurringEntry.hasScheduleChanged(draft: RecurringEntryDraft): Boolean =
         frequency != draft.frequency ||
             dayOfWeek != draft.selectedDay.takeIf { draft.frequency == RecurringFrequency.WEEKLY } ||
-            dayOfMonth != draft.selectedDay.takeIf { draft.frequency == RecurringFrequency.MONTHLY }
+            dayOfMonth != draft.selectedDay.takeIf { draft.frequency == RecurringFrequency.MONTHLY } ||
+            executionHour != draft.executionHour ||
+            executionMinute != draft.executionMinute
 
     private fun RecurringEntryDraft.toSchedule(): RecurringSchedule = when (frequency) {
         RecurringFrequency.WEEKLY -> RecurringSchedule.Weekly(DayOfWeek.of(selectedDay))

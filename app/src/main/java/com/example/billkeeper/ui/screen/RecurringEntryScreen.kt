@@ -1,5 +1,6 @@
 package com.example.billkeeper.ui.screen
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -54,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,6 +70,7 @@ import com.example.billkeeper.data.model.parseYuanToCents
 import com.example.billkeeper.domain.recurring.RecurringEntryType
 import com.example.billkeeper.domain.recurring.RecurringFrequency
 import com.example.billkeeper.domain.recurring.RecurringSchedule
+import com.example.billkeeper.domain.recurring.nextOccurrenceAfter
 import com.example.billkeeper.domain.recurring.occurrenceOnOrAfter
 import com.example.billkeeper.ui.theme.EXPENSE_CATEGORIES
 import com.example.billkeeper.ui.theme.INCOME_SOURCES
@@ -74,8 +78,11 @@ import com.example.billkeeper.viewmodel.RecurringEntryDraft
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun RecurringEntryScreen(vm: RecurringEntryViewModel) {
@@ -272,6 +279,7 @@ private fun RecurringEntryDialog(
     onSave: (RecurringEntryDraft) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var entryType by remember(entry?.id) {
         mutableStateOf(entry?.entryType ?: RecurringEntryType.EXPENSE)
     }
@@ -296,6 +304,12 @@ private fun RecurringEntryDialog(
                 RecurringFrequency.MONTHLY -> entry?.dayOfMonth ?: LocalDate.now().dayOfMonth
             }
         )
+    }
+    var executionHour by remember(entry?.id) {
+        mutableIntStateOf(entry?.executionHour ?: 8)
+    }
+    var executionMinute by remember(entry?.id) {
+        mutableIntStateOf(entry?.executionMinute ?: 0)
     }
 
     AlertDialog(
@@ -345,8 +359,25 @@ private fun RecurringEntryDialog(
                         selectedDay = dayOptions(frequency).first { it.second == label }.first
                     }
                 )
+                OutlinedButton(
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, hour, minute ->
+                                executionHour = hour
+                                executionMinute = minute
+                            },
+                            executionHour,
+                            executionMinute,
+                            true
+                        ).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("执行时间 ${formatExecutionTime(executionHour, executionMinute)}")
+                }
                 Text(
-                    text = "首次执行：${firstRunLabel(frequency, selectedDay)}",
+                    text = "首次执行：${firstRunLabel(frequency, selectedDay, executionHour, executionMinute)}",
                     color = Color(0xFF455A64),
                     fontSize = 13.sp
                 )
@@ -372,7 +403,9 @@ private fun RecurringEntryDialog(
                             amountCents = amountCents,
                             note = note,
                             frequency = frequency,
-                            selectedDay = selectedDay
+                            selectedDay = selectedDay,
+                            executionHour = executionHour,
+                            executionMinute = executionMinute
                         )
                     )
                     onDismiss()
@@ -486,23 +519,40 @@ private fun dayOptions(frequency: RecurringFrequency): List<Pair<Int, String>> =
 private fun selectedDayLabel(frequency: RecurringFrequency, selectedDay: Int): String =
     dayOptions(frequency).first { it.first == selectedDay }.second
 
-private fun firstRunLabel(frequency: RecurringFrequency, selectedDay: Int): String {
+private fun firstRunLabel(
+    frequency: RecurringFrequency,
+    selectedDay: Int,
+    executionHour: Int,
+    executionMinute: Int
+): String {
     val schedule = when (frequency) {
         RecurringFrequency.WEEKLY -> RecurringSchedule.Weekly(java.time.DayOfWeek.of(selectedDay))
         RecurringFrequency.MONTHLY -> RecurringSchedule.Monthly(selectedDay)
     }
-    return occurrenceOnOrAfter(schedule, LocalDate.now()).format(DATE_FORMATTER)
+    val now = LocalDateTime.now()
+    val executionTime = LocalTime.of(executionHour, executionMinute)
+    var firstDate = occurrenceOnOrAfter(schedule, now.toLocalDate())
+    if (firstDate == now.toLocalDate() && !now.toLocalTime().isBefore(executionTime)) {
+        firstDate = nextOccurrenceAfter(schedule, firstDate)
+    }
+    return firstDate.atTime(executionTime).format(DATE_TIME_FORMATTER)
 }
 
-private fun RecurringEntry.scheduleLabel(): String = when (frequency) {
-    RecurringFrequency.WEEKLY -> selectedDayLabel(frequency, requireNotNull(dayOfWeek))
-    RecurringFrequency.MONTHLY -> selectedDayLabel(frequency, requireNotNull(dayOfMonth))
+private fun RecurringEntry.scheduleLabel(): String {
+    val dayLabel = when (frequency) {
+        RecurringFrequency.WEEKLY -> selectedDayLabel(frequency, requireNotNull(dayOfWeek))
+        RecurringFrequency.MONTHLY -> selectedDayLabel(frequency, requireNotNull(dayOfMonth))
+    }
+    return "$dayLabel ${formatExecutionTime(executionHour, executionMinute)}"
 }
 
 private fun RecurringEntry.nextRunLabel(): String =
     Instant.ofEpochMilli(nextRunAt)
         .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-        .format(DATE_FORMATTER)
+        .toLocalDateTime()
+        .format(DATE_TIME_FORMATTER)
 
-private val DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE
+private fun formatExecutionTime(hour: Int, minute: Int): String =
+    String.format(Locale.getDefault(), "%02d:%02d", hour, minute)
+
+private val DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")

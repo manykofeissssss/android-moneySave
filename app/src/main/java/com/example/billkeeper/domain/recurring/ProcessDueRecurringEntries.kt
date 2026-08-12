@@ -5,6 +5,7 @@ import com.example.billkeeper.data.repository.LedgerRepository
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 
 data class RecurringExecutionResult(
@@ -17,15 +18,18 @@ class ProcessDueRecurringEntries(
     private val zoneId: ZoneId = ZoneId.systemDefault()
 ) {
     suspend operator fun invoke(nowMillis: Long = System.currentTimeMillis()): RecurringExecutionResult {
-        val today = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
+        val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
+        val today = now.toLocalDate()
         var generatedEntryCount = 0
         var processedScheduleCount = 0
 
         repository.getDueRecurringEntries(nowMillis).forEach { entry ->
+            val executionTime = LocalTime.of(entry.executionHour, entry.executionMinute)
+            val throughDate = if (now.toLocalTime().isBefore(executionTime)) today.minusDays(1) else today
             val occurrenceDates = dueOccurrences(
                 schedule = entry.toSchedule(),
                 firstDueDate = entry.nextRunAt.toLocalDate(),
-                throughDate = today
+                throughDate = throughDate
             )
             if (occurrenceDates.isEmpty()) return@forEach
 
@@ -33,8 +37,8 @@ class ProcessDueRecurringEntries(
             val applied = repository.executeRecurringOccurrences(
                 entryId = entry.id,
                 expectedNextRunAt = entry.nextRunAt,
-                occurrenceTimes = occurrenceDates.map { it.atStartOfDayMillis() },
-                nextRunAt = nextDate.atStartOfDayMillis()
+                occurrenceTimes = occurrenceDates.map { it.atTimeMillis(executionTime) },
+                nextRunAt = nextDate.atTimeMillis(executionTime)
             )
             if (applied) {
                 generatedEntryCount += occurrenceDates.size
@@ -53,6 +57,6 @@ class ProcessDueRecurringEntries(
     private fun Long.toLocalDate(): LocalDate =
         Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
 
-    private fun LocalDate.atStartOfDayMillis(): Long =
-        atStartOfDay(zoneId).toInstant().toEpochMilli()
+    private fun LocalDate.atTimeMillis(time: LocalTime): Long =
+        atTime(time).atZone(zoneId).toInstant().toEpochMilli()
 }

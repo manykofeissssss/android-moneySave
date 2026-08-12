@@ -374,7 +374,8 @@ private fun EditDateField(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        onDateSelected(it.toLocalStartOfDayMillis())
+                        val selectedDay=it.toLocalStartOfDayMillis()
+                        onDateSelected(selectedDay.withTimeFrom(selectedDate))
                     }
                     showDatePicker = false
                 }) {

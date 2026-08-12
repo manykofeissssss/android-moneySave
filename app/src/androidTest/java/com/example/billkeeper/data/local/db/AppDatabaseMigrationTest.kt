@@ -42,7 +42,8 @@ class AppDatabaseMigrationTest {
             .addMigrations(
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
-                AppDatabase.MIGRATION_3_4
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5
             )
             .build()
 
@@ -77,7 +78,8 @@ class AppDatabaseMigrationTest {
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
             .addMigrations(
                 AppDatabase.MIGRATION_2_3,
-                AppDatabase.MIGRATION_3_4
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5
             )
             .build()
 
@@ -114,7 +116,7 @@ class AppDatabaseMigrationTest {
         createVersionThreeDatabase()
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_3_4)
+            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
             .build()
         val recurringEntry = RecurringEntry(
             id = 11,
@@ -152,6 +154,27 @@ class AppDatabaseMigrationTest {
                 ),
                 database.monthlyBudgetDao().observeByMonth(2026, 7).first()
             )
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersionFour_addsExecutionTimeWithDefaultValues() = runBlocking {
+        createVersionFourDatabase()
+
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_4_5)
+            .build()
+
+        try {
+            database.openHelper.writableDatabase
+            val entry = requireNotNull(database.recurringEntryDao().getById(11))
+
+            assertEquals(0, entry.executionHour)
+            assertEquals(0, entry.executionMinute)
+            assertEquals("鎴跨", entry.categoryOrSource)
+            assertEquals(250000, entry.amountCents)
         } finally {
             database.close()
         }
@@ -256,6 +279,50 @@ class AppDatabaseMigrationTest {
                 """.trimIndent()
             )
             database.version = 3
+        }
+    }
+
+    private fun createVersionFourDatabase() {
+        createVersionThreeDatabase()
+
+        val databaseFile = context.getDatabasePath(databaseName)
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { database ->
+            database.execSQL(
+                """
+                CREATE TABLE recurring_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    entryType TEXT NOT NULL,
+                    categoryOrSource TEXT NOT NULL,
+                    amountCents INTEGER NOT NULL,
+                    note TEXT NOT NULL,
+                    frequency TEXT NOT NULL,
+                    dayOfWeek INTEGER,
+                    dayOfMonth INTEGER,
+                    nextRunAt INTEGER NOT NULL,
+                    lastExecutedAt INTEGER,
+                    enabled INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            database.execSQL(
+                """
+                CREATE INDEX index_recurring_entries_enabled_nextRunAt
+                ON recurring_entries(enabled, nextRunAt)
+                """.trimIndent()
+            )
+            database.execSQL(
+                """
+                INSERT INTO recurring_entries (
+                    id, entryType, categoryOrSource, amountCents, note, frequency,
+                    dayOfWeek, dayOfMonth, nextRunAt, lastExecutedAt, enabled, createdAt
+                ) VALUES (
+                    11, 'EXPENSE', '鎴跨', 250000, '姣忔湀鎴跨', 'MONTHLY',
+                    NULL, 31, 1788192000000, NULL, 1, 1785513600000
+                )
+                """.trimIndent()
+            )
+            database.version = 4
         }
     }
 }

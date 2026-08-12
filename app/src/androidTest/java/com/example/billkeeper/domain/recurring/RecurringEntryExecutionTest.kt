@@ -14,6 +14,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 @RunWith(AndroidJUnit4::class)
@@ -38,7 +40,8 @@ class RecurringEntryExecutionTest {
 
     @Test
     fun processingDueMonthlyEntry_catchesUpAndDoesNotInsertDuplicates() = runBlocking {
-        val firstRunAt = LocalDate.of(2026, 1, 31).atStartOfDayMillis()
+        val executionTime = LocalTime.of(8, 30)
+        val firstRunAt = LocalDate.of(2026, 1, 31).atTimeMillis(executionTime)
         repository.upsertRecurringEntry(
             RecurringEntry(
                 id = 7,
@@ -49,7 +52,9 @@ class RecurringEntryExecutionTest {
                 frequency = RecurringFrequency.MONTHLY,
                 dayOfMonth = 31,
                 nextRunAt = firstRunAt,
-                createdAt = firstRunAt
+                createdAt = firstRunAt,
+                executionHour = executionTime.hour,
+                executionMinute = executionTime.minute
             )
         )
         val now = LocalDate.of(2026, 4, 30)
@@ -78,11 +83,25 @@ class RecurringEntryExecutionTest {
         )
         assertEquals(LocalDate.of(2026, 4, 30), updatedEntry.lastExecutedAt!!.toLocalDate())
         assertEquals(LocalDate.of(2026, 5, 31), updatedEntry.nextRunAt.toLocalDate())
+        assertEquals(
+            listOf(
+                LocalDateTime.of(2026, 4, 30, 8, 30),
+                LocalDateTime.of(2026, 3, 31, 8, 30),
+                LocalDateTime.of(2026, 2, 28, 8, 30),
+                LocalDateTime.of(2026, 1, 31, 8, 30)
+            ),
+            bills.map { it.date.toLocalDateTime() }
+        )
+        assertEquals(LocalDateTime.of(2026, 4, 30, 8, 30), updatedEntry.lastExecutedAt!!.toLocalDateTime())
+        assertEquals(LocalDateTime.of(2026, 5, 31, 8, 30), updatedEntry.nextRunAt.toLocalDateTime())
     }
 
-    private fun LocalDate.atStartOfDayMillis(): Long =
-        atStartOfDay(zoneId).toInstant().toEpochMilli()
+    private fun LocalDate.atTimeMillis(time: LocalTime): Long =
+        atTime(time).atZone(zoneId).toInstant().toEpochMilli()
 
     private fun Long.toLocalDate(): LocalDate =
         java.time.Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
+
+    private fun Long.toLocalDateTime(): LocalDateTime =
+        java.time.Instant.ofEpochMilli(this).atZone(zoneId).toLocalDateTime()
 }

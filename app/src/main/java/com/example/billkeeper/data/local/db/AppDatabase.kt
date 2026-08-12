@@ -21,7 +21,7 @@ import com.example.billkeeper.data.local.entity.RecurringEntry
         MonthlyBudget::class,
         RecurringEntry::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(RecurringEntryConverters::class)
@@ -121,6 +121,18 @@ abstract class AppDatabase : RoomDatabase() {
                     CREATE INDEX IF NOT EXISTS index_recurring_entries_enabled_nextRunAt
                     ON recurring_entries(enabled, nextRunAt)
                     """.trimIndent()
+                )
+            }
+        }
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE recurring_entries " +
+                            "ADD COLUMN executionHour INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE recurring_entries " +
+                            "ADD COLUMN executionMinute INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

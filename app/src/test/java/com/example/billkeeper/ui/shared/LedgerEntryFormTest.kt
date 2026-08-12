@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 class LedgerEntryFormTest {
@@ -21,5 +22,24 @@ class LedgerEntryFormTest {
 
         assertEquals("2026-07-24T00:00:00Z", Instant.ofEpochMilli(datePickerValue).toString())
         assertEquals(localStart, convertedBack)
+    }
+
+    @Test
+    fun withTimeFrom_combinesSelectedDateAndSourceTime() {
+        val selectedDate = LocalDate.of(2026, 8, 10)
+            .atStartOfDay(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        val timeSource = LocalDateTime.of(2026, 8, 12, 14, 35, 27)
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        val result = selectedDate.withTimeFrom(timeSource, zoneId)
+
+        assertEquals(
+            LocalDateTime.of(2026, 8, 10, 14, 35, 27),
+            Instant.ofEpochMilli(result).atZone(zoneId).toLocalDateTime()
+        )
     }
 }

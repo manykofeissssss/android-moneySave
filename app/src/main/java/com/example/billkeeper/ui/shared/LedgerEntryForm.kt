@@ -164,7 +164,11 @@ fun LedgerEntryForm(
                     if (amountCents == null) {
                         amountError = "请输入大于 0 的有效金额"
                     } else {
-                        val entryDate = if (allowDateSelection) selectedDate else System.currentTimeMillis()
+                        val entryDate = if (allowDateSelection) {
+                            selectedDate.withTimeFrom(System.currentTimeMillis())
+                        } else {
+                            System.currentTimeMillis()
+                        }
                         onSubmit(selectedOption, amountCents, noteText.trim(), entryDate)
                         amountText = ""
                         noteText = ""
@@ -199,6 +203,24 @@ fun LedgerEntryForm(
             DatePicker(state = datePickerState)
         }
     }
+}
+
+internal fun Long.withTimeFrom(
+    timeSourceMillis: Long,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Long {
+    val date = Instant.ofEpochMilli(this)
+        .atZone(zoneId)
+        .toLocalDate()
+
+    val time = Instant.ofEpochMilli(timeSourceMillis)
+        .atZone(zoneId)
+        .toLocalTime()
+
+    return date.atTime(time)
+        .atZone(zoneId)
+        .toInstant()
+        .toEpochMilli()
 }
 
 internal fun Long.toLocalStartOfDayMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {

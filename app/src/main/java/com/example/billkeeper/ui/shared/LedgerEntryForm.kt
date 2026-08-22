@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -64,6 +65,8 @@ fun LedgerEntryForm(
     options: List<String>,
     actionColor: Color,
     allowDateSelection: Boolean = true,
+    showTitle: Boolean = true,
+    onInputFocus: () -> Unit = {},
     onSubmit: (option: String, amountCents: Long, note: String, date: Long) -> Unit
 ) {
     require(options.isNotEmpty()) { "Entry options must not be empty." }
@@ -86,8 +89,10 @@ fun LedgerEntryForm(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(Modifier.height(12.dp))
+            if (showTitle) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Spacer(Modifier.height(12.dp))
+            }
 
             Text(optionLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
@@ -125,7 +130,9 @@ fun LedgerEntryForm(
                 leadingIcon = { Text("¥") },
                 isError = amountError != null,
                 supportingText = { amountError?.let { Text(it) } },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { if (it.isFocused) onInputFocus() }
             )
 
             if (allowDateSelection) {
@@ -154,7 +161,9 @@ fun LedgerEntryForm(
                 value = noteText,
                 onValueChange = { noteText = it },
                 label = { Text("备注（可选）") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { if (it.isFocused) onInputFocus() }
             )
 
             Spacer(Modifier.height(12.dp))

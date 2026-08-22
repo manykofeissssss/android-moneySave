@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,7 +37,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,7 +49,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -140,13 +137,12 @@ fun AppBackground(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackgroundSettingsDialog(
+fun BackgroundSettingsScreen(
     preferences: BackgroundPreferences,
     appearancePreferences: AppearancePreferences,
     settings: AppearanceSettings,
     darkTheme: Boolean,
-    onBackgroundChanged: () -> Unit,
-    onDismiss: () -> Unit
+    onBackgroundChanged: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
@@ -204,16 +200,17 @@ fun BackgroundSettingsDialog(
     )
     val displayedPreview = preview ?: currentBackground
 
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("外观设置") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
                 if (!darkTheme) {
                     Text("自定义颜色", fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -324,19 +321,17 @@ fun BackgroundSettingsDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("恢复默认外观") }
 
-                errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (isSaving) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
+            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (isSaving) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+        }
+        Button(
+            onClick = {
                     if (pendingBackgroundStyle == BackgroundStyle.IMAGE &&
                         pendingUri == null &&
                         (!preferences.hasCustomBackground || removeStoredImage)
                     ) {
                         errorMessage = "请先选择背景图片"
-                        return@TextButton
+                        return@Button
                     }
                     isSaving = true
                     scope.launch {
@@ -355,21 +350,20 @@ fun BackgroundSettingsDialog(
                                 )
                             )
                         }.onSuccess {
+                            isSaving = false
                             onBackgroundChanged()
-                            onDismiss()
                         }.onFailure {
                             errorMessage = it.localizedMessage ?: "外观设置保存失败"
                             isSaving = false
                         }
                     }
-                },
-                enabled = !isSaving
-            ) { Text("应用") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isSaving) { Text("取消") }
-        }
-    )
+            },
+            enabled = !isSaving,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+        ) { Text("应用") }
+    }
 }
 
 @Composable

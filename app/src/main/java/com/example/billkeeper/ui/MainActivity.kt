@@ -13,6 +13,8 @@ import com.example.billkeeper.background.BackgroundStyle
 import com.example.billkeeper.ui.theme.BillKeeperTheme
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModelFactory
+import com.example.billkeeper.viewmodel.DailyLedgerViewModel
+import com.example.billkeeper.viewmodel.DailyLedgerViewModelFactory
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import com.example.billkeeper.viewmodel.RecurringEntryViewModelFactory
 import androidx.compose.runtime.getValue
@@ -28,6 +30,9 @@ class MainActivity : ComponentActivity() {
     private val recurringVm: RecurringEntryViewModel by viewModels {
         val app = application as BillKeeperApplication
         RecurringEntryViewModelFactory(app.repository, app.recurringScheduler)
+    }
+    private val dailyLedgerVm: DailyLedgerViewModel by viewModels {
+        DailyLedgerViewModelFactory((application as BillKeeperApplication).repository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +59,7 @@ class MainActivity : ComponentActivity() {
                     BillKeeperApp(
                         vm = vm,
                         recurringVm = recurringVm,
+                        dailyLedgerVm = dailyLedgerVm,
                         appearanceSettings = appearanceSettings,
                         appearancePreferences = appearancePreferences,
                         darkTheme = darkTheme

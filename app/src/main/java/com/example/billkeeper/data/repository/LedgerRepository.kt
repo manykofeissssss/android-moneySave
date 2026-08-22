@@ -23,6 +23,9 @@ class LedgerRepository(private val db: AppDatabase) {
     fun getBillsByMonth(startMs: Long, endMs: Long): Flow<List<BillItem>> =
         db.billDao().getByMonth(startMs, endMs)
 
+    fun getBillsBetween(startMs: Long, endExclusiveMs: Long): Flow<List<BillItem>> =
+        db.billDao().getByMonth(startMs, endExclusiveMs)
+
     fun getTotalExpenseByMonth(startMs: Long, endMs: Long): Flow<Long> =
         db.billDao().getTotalExpenseByMonth(startMs, endMs)
 
@@ -54,6 +57,9 @@ class LedgerRepository(private val db: AppDatabase) {
 
     fun getIncomesByMonth(startMs: Long, endMs: Long): Flow<List<IncomeItem>> =
         db.incomeDao().getByMonth(startMs, endMs)
+
+    fun getIncomesBetween(startMs: Long, endExclusiveMs: Long): Flow<List<IncomeItem>> =
+        db.incomeDao().getByMonth(startMs, endExclusiveMs)
 
     fun getTotalIncomeByMonth(startMs: Long, endMs: Long): Flow<Long> =
         db.incomeDao().getTotalIncomeByMonth(startMs, endMs)

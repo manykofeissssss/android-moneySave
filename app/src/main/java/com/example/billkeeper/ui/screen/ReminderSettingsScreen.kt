@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -34,11 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.billkeeper.notification.ReminderPreferences
 import com.example.billkeeper.notification.ReminderNotifications
 import com.example.billkeeper.notification.ReminderScheduler
@@ -49,7 +49,7 @@ import com.example.billkeeper.notification.hasNotificationPermission
 import java.util.Locale
 
 @Composable
-fun ReminderSettingsDialog(onDismiss: () -> Unit) {
+fun ReminderSettingsScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val preferences = remember { ReminderPreferences(context) }
@@ -119,14 +119,13 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
         ).show()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("记账提醒") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
                 ReminderToggleRow(
                     title = "提醒一",
                     time = middayTime,
@@ -231,15 +230,10 @@ fun ReminderSettingsDialog(onDismiss: () -> Unit) {
                     Text("发送测试通知")
                 }
 
-                statusMessage?.let { message ->
-                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("完成") }
+        statusMessage?.let { message ->
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    )
+    }
 }
 
 @Composable

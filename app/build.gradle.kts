@@ -12,7 +12,7 @@ android {
     compileSdkMinor = 1
 
     defaultConfig {
-        applicationId = "com.example.billkeeper"
+        applicationId = "com.example.billkeeper.experiment"
         minSdk = 26
         targetSdk = 34
         versionCode = 4

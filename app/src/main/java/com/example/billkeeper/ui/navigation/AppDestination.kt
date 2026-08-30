@@ -1,24 +1,150 @@
 package com.example.billkeeper.ui.navigation
 
-import androidx.navigation3.runtime.NavKey
-import kotlinx.serialization.Serializable
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import com.example.billkeeper.background.AppearancePreferences
+import com.example.billkeeper.background.AppearanceSettings
+import com.example.billkeeper.background.BackgroundPreferences
+import com.example.billkeeper.ui.background.BackgroundSettingsScreen
+import com.example.billkeeper.ui.screen.DailyLedgerScreen
+import com.example.billkeeper.ui.screen.HomeScreen
+import com.example.billkeeper.ui.screen.MoreFeaturesScreen
+import com.example.billkeeper.ui.screen.RecurringEntryScreen
+import com.example.billkeeper.ui.screen.ReminderSettingsScreen
+import com.example.billkeeper.viewmodel.DailyLedgerViewModel
+import com.example.billkeeper.viewmodel.LedgerViewModel
+import com.example.billkeeper.viewmodel.RecurringEntryViewModel
+import com.xah.navigation.model.dest.Destination
+import com.xah.navigation.util.LocalNavController
+import com.xah.navigation.util.LocalNavDependencies
 
-sealed interface AppDestination : NavKey
+data class BillKeeperNavDependencies(
+    val ledgerViewModel: LedgerViewModel,
+    val recurringEntryViewModel: RecurringEntryViewModel,
+    val dailyLedgerViewModel: DailyLedgerViewModel,
+    val appearanceSettings: AppearanceSettings,
+    val appearancePreferences: AppearancePreferences,
+    val backgroundPreferences: BackgroundPreferences,
+    val darkTheme: Boolean,
+    val snackbarHostState: SnackbarHostState,
+    val onBackgroundChanged: () -> Unit
+)
 
-@Serializable
-data object HomeDestination : AppDestination
+@Composable
+private fun billKeeperDependencies(): BillKeeperNavDependencies =
+    LocalNavDependencies.current.get()
 
-@Serializable
-data object MoreFeaturesDestination : AppDestination
+object HomeDestination : Destination() {
+    override val key = "home"
 
-@Serializable
-data object DailyLedgerDestination : AppDestination
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
 
-@Serializable
-data object RecurringEntriesDestination : AppDestination
+        HomeScreen(
+            vm = deps.ledgerViewModel,
+            snackbarHostState = deps.snackbarHostState,
+            onOpenMoreFeatures = {
+                navController.push(MoreFeaturesDestination)
+            }
+        )
+    }
+}
 
-@Serializable
-data object ReminderSettingsDestination : AppDestination
+object MoreFeaturesDestination : Destination() {
+    override val key = "more_features"
 
-@Serializable
-data object AppearanceSettingsDestination : AppDestination
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
+
+        FeaturePageScaffold(
+            title = "更多功能",
+            onBack = { navController.pop() },
+            snackbarHostState = deps.snackbarHostState
+        ) {
+            MoreFeaturesScreen(
+                onOpenDailyLedger = { navController.push(DailyLedgerDestination) },
+                onOpenRecurringEntries = { navController.push(RecurringEntriesDestination) },
+                onOpenReminderSettings = { navController.push(ReminderSettingsDestination) },
+                onOpenAppearanceSettings = { navController.push(AppearanceSettingsDestination) }
+            )
+        }
+    }
+}
+
+object DailyLedgerDestination : Destination() {
+    override val key = "daily_ledger"
+
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
+        FeaturePageScaffold(
+            title = "单日账单查询",
+            onBack = { navController.pop() },
+            snackbarHostState = deps.snackbarHostState
+        ) {
+            DailyLedgerScreen(deps.dailyLedgerViewModel)
+        }
+    }
+}
+
+object RecurringEntriesDestination : Destination() {
+    override val key = "recurring_entries"
+
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
+        FeaturePageScaffold(
+            title = "周期记账",
+            onBack = { navController.pop() },
+            snackbarHostState = deps.snackbarHostState
+        ) {
+            RecurringEntryScreen(deps.recurringEntryViewModel)
+        }
+    }
+}
+
+object ReminderSettingsDestination : Destination() {
+    override val key = "reminder_settings"
+
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
+        FeaturePageScaffold(
+            title = "记账提醒",
+            onBack = { navController.pop() },
+            snackbarHostState = deps.snackbarHostState
+        ) {
+            ReminderSettingsScreen()
+        }
+    }
+}
+
+object AppearanceSettingsDestination : Destination() {
+    override val key = "appearance_settings"
+
+    @Composable
+    override fun Content() {
+        val deps = billKeeperDependencies()
+        val navController = LocalNavController.current
+        FeaturePageScaffold(
+            title = "外观设置",
+            onBack = { navController.pop() },
+            snackbarHostState = deps.snackbarHostState
+        ) {
+            BackgroundSettingsScreen(
+                preferences = deps.backgroundPreferences,
+                appearancePreferences = deps.appearancePreferences,
+                settings = deps.appearanceSettings,
+                darkTheme = deps.darkTheme,
+                onBackgroundChanged = deps.onBackgroundChanged
+            )
+        }
+    }
+}

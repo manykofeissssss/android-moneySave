@@ -90,7 +90,6 @@ object DailyLedgerDestination : Destination() {
         FeaturePageScaffold(
             title = "单日账单查询",
             titleIcon = Icons.Default.CalendarMonth,
-            sharedContainerKey = "daily_ledger",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -109,7 +108,6 @@ object RecurringEntriesDestination : Destination() {
         FeaturePageScaffold(
             title = "周期记账",
             titleIcon = Icons.Default.Repeat,
-            sharedContainerKey = "recurring_entries",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -128,7 +126,6 @@ object ReminderSettingsDestination : Destination() {
         FeaturePageScaffold(
             title = "记账提醒",
             titleIcon = Icons.Default.Notifications,
-            sharedContainerKey = "reminder_settings",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -147,7 +144,6 @@ object AppearanceSettingsDestination : Destination() {
         FeaturePageScaffold(
             title = "外观设置",
             titleIcon = Icons.Default.Palette,
-            sharedContainerKey = "appearance_settings",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {

@@ -3,6 +3,7 @@ package com.example.billkeeper.ui.screen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -66,26 +67,27 @@ fun MoreFeaturesScreen(
     ) {
         items(features.size) { index ->
             val feature = features[index]
-            ListItem(
-                headlineContent = { Text(feature.title) },
-                supportingContent = { Text(feature.description) },
-                leadingContent = {
-                    SharedContainer(
-                        key = feature.sharedKey,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+            SharedContainer(
+                key = feature.sharedKey,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ListItem(
+                    headlineContent = { Text(feature.title) },
+                    supportingContent = { Text(feature.description) },
+                    leadingContent = {
                         Icon(
                             imageVector = feature.icon,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )
-                    }
-                },
-                trailingContent = {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "进入${feature.title}")
-                },
-                modifier = Modifier.clickable(onClick = feature.onClick)
-            )
+                    },
+                    trailingContent = {
+                        Icon(Icons.Default.ChevronRight, contentDescription = "进入${feature.title}")
+                    },
+                    modifier = Modifier.clickable(onClick = feature.onClick)
+                )
+            }
             if (index < features.lastIndex) HorizontalDivider()
         }
     }

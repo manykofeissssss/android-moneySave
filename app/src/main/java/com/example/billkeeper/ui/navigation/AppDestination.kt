@@ -1,6 +1,11 @@
 package com.example.billkeeper.ui.navigation
 
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.runtime.Composable
 import com.example.billkeeper.background.AppearancePreferences
 import com.example.billkeeper.background.AppearanceSettings
@@ -84,6 +89,8 @@ object DailyLedgerDestination : Destination() {
         val navController = LocalNavController.current
         FeaturePageScaffold(
             title = "单日账单查询",
+            titleIcon = Icons.Default.CalendarMonth,
+            sharedContainerKey = "daily_ledger",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -101,6 +108,8 @@ object RecurringEntriesDestination : Destination() {
         val navController = LocalNavController.current
         FeaturePageScaffold(
             title = "周期记账",
+            titleIcon = Icons.Default.Repeat,
+            sharedContainerKey = "recurring_entries",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -118,6 +127,8 @@ object ReminderSettingsDestination : Destination() {
         val navController = LocalNavController.current
         FeaturePageScaffold(
             title = "记账提醒",
+            titleIcon = Icons.Default.Notifications,
+            sharedContainerKey = "reminder_settings",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {
@@ -135,6 +146,8 @@ object AppearanceSettingsDestination : Destination() {
         val navController = LocalNavController.current
         FeaturePageScaffold(
             title = "外观设置",
+            titleIcon = Icons.Default.Palette,
+            sharedContainerKey = "appearance_settings",
             onBack = { navController.pop() },
             snackbarHostState = deps.snackbarHostState
         ) {

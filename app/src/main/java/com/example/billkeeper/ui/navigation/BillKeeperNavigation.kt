@@ -3,6 +3,8 @@ package com.example.billkeeper.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,6 +19,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import com.xah.container.component.base.SharedContainer
 import androidx.compose.ui.Modifier
 import com.example.billkeeper.background.AppearancePreferences
 import com.example.billkeeper.background.AppearanceSettings
@@ -88,6 +94,8 @@ fun BillKeeperNavigation(
 @Composable
 internal fun FeaturePageScaffold(
     title: String,
+    titleIcon: ImageVector? = null,
+    sharedContainerKey: String? = null,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,
     content: @Composable () -> Unit
@@ -96,7 +104,22 @@ internal fun FeaturePageScaffold(
         containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        titleIcon?.let { icon ->
+                            SharedContainer(
+                                key = sharedContainerKey,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null
+                                )
+                            }
+                            Text(title, modifier = Modifier.padding(start = 8.dp))
+                        } ?: Text(title)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.xah.container.component.base.SharedContainer
 
 @Composable
 fun MoreFeaturesScreen(
@@ -32,24 +34,28 @@ fun MoreFeaturesScreen(
             title = "单日账单查询",
             description = "查看指定日期的收入、支出与结余",
             icon = Icons.Default.CalendarMonth,
+            sharedKey = "daily_ledger",
             onClick = onOpenDailyLedger
         ),
         FeatureItem(
             title = "周期记账",
             description = "管理每周或每月自动生成的账目",
             icon = Icons.Default.Repeat,
+            sharedKey = "recurring_entries",
             onClick = onOpenRecurringEntries
         ),
         FeatureItem(
             title = "记账提醒",
             description = "设置每天的提醒时间与通知权限",
             icon = Icons.Default.Notifications,
+            sharedKey = "reminder_settings",
             onClick = onOpenReminderSettings
         ),
         FeatureItem(
             title = "外观设置",
             description = "调整主题色、背景色和背景图片",
             icon = Icons.Default.Palette,
+            sharedKey = "appearance_settings",
             onClick = onOpenAppearanceSettings
         )
     )
@@ -64,11 +70,16 @@ fun MoreFeaturesScreen(
                 headlineContent = { Text(feature.title) },
                 supportingContent = { Text(feature.description) },
                 leadingContent = {
-                    Icon(
-                        imageVector = feature.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    SharedContainer(
+                        key = feature.sharedKey,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = feature.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 },
                 trailingContent = {
                     Icon(Icons.Default.ChevronRight, contentDescription = "进入${feature.title}")
@@ -84,5 +95,6 @@ private data class FeatureItem(
     val title: String,
     val description: String,
     val icon: ImageVector,
+    val sharedKey: String,
     val onClick: () -> Unit
 )

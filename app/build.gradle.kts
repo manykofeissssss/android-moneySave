@@ -1,3 +1,24 @@
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.isFile) {
+    localPropertiesFile.inputStream().use(localProperties::load)
+}
+
+fun localProperty(name: String): String =
+    localProperties.getProperty(name)
+        ?.trim()
+        ?.removeSurrounding("\"")
+        ?.removeSurrounding("'")
+        .orEmpty()
+
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
+
+val supabaseUrl = localProperty("SUPABASE_URL")
+val supabasePublishableKey = localProperty("SUPABASE_PUBLISHABLE_KEY")
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,6 +39,12 @@ android {
         versionCode = 4
         versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_URL", buildConfigString(supabaseUrl))
+        buildConfigField(
+            "String",
+            "SUPABASE_PUBLISHABLE_KEY",
+            buildConfigString(supabasePublishableKey)
+        )
     }
 
     buildTypes {

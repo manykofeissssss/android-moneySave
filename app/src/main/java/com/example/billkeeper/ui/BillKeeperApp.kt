@@ -28,9 +28,11 @@ import com.example.billkeeper.viewmodel.DailyLedgerViewModel
 import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsHandle
+import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEvent
 import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEventType
 import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticStatus
 import kotlinx.coroutines.delay
+import java.util.UUID
 
 @Composable
 fun BillKeeperApp(
@@ -108,8 +110,34 @@ fun BillKeeperApp(
             onCrash = { throw RuntimeException("BK diagnostics manual crash") },
             onAnr = { Thread.sleep(diagnostics.config.anrTimeoutMillis + 1_000L) },
             onUiBlock = { Thread.sleep(diagnostics.config.uiBlockThresholdMillis + 150L) },
+            onSyntheticCrash = {
+                appendSyntheticDiagnosticEvent(diagnostics, DiagnosticEventType.CRASH)
+                refreshDiagnostics()
+            },
+            onSyntheticAnr = {
+                appendSyntheticDiagnosticEvent(diagnostics, DiagnosticEventType.ANR)
+                refreshDiagnostics()
+            },
+            onSyntheticUiBlock = {
+                appendSyntheticDiagnosticEvent(diagnostics, DiagnosticEventType.UI_BLOCK)
+                refreshDiagnostics()
+            },
             onRefresh = refreshDiagnostics,
             onUpload = onEnqueueDiagnosticUpload,
+            onRetryFailed = {
+                diagnosticEvents
+                    .filter { it.status == DiagnosticStatus.FAILED }
+                    .forEach {
+                        diagnostics.store.save(
+                            it.copy(
+                                status = DiagnosticStatus.PENDING,
+                                lastError = null
+                            )
+                        )
+                    }
+                refreshDiagnostics()
+                onEnqueueDiagnosticUpload()
+            },
             onDeletePending = {
                 diagnosticEvents
                     .filter { it.status == DiagnosticStatus.PENDING }
@@ -139,4 +167,33 @@ fun BillKeeperApp(
                 )
             }
     }
+}
+
+private fun appendSyntheticDiagnosticEvent(
+    diagnostics: DiagnosticsHandle,
+    type: DiagnosticEventType
+) {
+    val timestampMillis = System.currentTimeMillis()
+    diagnostics.store.append(
+        DiagnosticEvent(
+            eventId = "debug-${type.name.lowercase()}-${timestampMillis}-${UUID.randomUUID()}",
+            type = type,
+            timestampMillis = timestampMillis,
+            appVersion = com.example.billkeeper.BuildConfig.VERSION_NAME,
+            deviceModel = "debug-device",
+            androidVersion = android.os.Build.VERSION.RELEASE,
+            threadName = "debug-test",
+            durationMillis = when (type) {
+                DiagnosticEventType.CRASH -> null
+                DiagnosticEventType.ANR -> 6_000L
+                DiagnosticEventType.UI_BLOCK -> 400L
+            },
+            message = "Synthetic ${type.name} event from DiagnosticsTestPanel",
+            stackTrace = "Synthetic stack trace; no process crash was triggered.",
+            metadata = mapOf(
+                "source" to "billkeeper-debug-panel",
+                "synthetic" to "true"
+            )
+        )
+    )
 }

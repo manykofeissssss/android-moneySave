@@ -7,7 +7,7 @@ import com.example.billkeeper.data.local.db.AppDatabase
 import com.example.billkeeper.data.repository.LedgerRepository
 import com.example.billkeeper.diagnostics.BillKeeperDiagnosticReporter
 import com.example.billkeeper.diagnostics.SupabaseDiagnosticApi
-import com.example.billkeeper.diagnostics.UnconfiguredSupabaseDiagnosticApi
+import com.example.billkeeper.diagnostics.SupabaseDiagnosticApiProvider
 import com.example.billkeeper.notification.ReminderNotifications
 import com.example.billkeeper.notification.ReminderScheduler
 import io.github.manykofeissssss.kdiagnostics.android.runtime.Diagnostics
@@ -31,9 +31,9 @@ class BillKeeperApplication : Application() {
         )
     }
 
-    /** Replace only this API with the real Supabase adapter when it is ready. */
+    /** BK owns the backend adapter; k-diagnostics remains backend-agnostic. */
     private val supabaseDiagnosticApi: SupabaseDiagnosticApi =
-        UnconfiguredSupabaseDiagnosticApi
+        SupabaseDiagnosticApiProvider.fromBuildConfig()
 
     val diagnosticReporter: DiagnosticReporter by lazy {
         BillKeeperDiagnosticReporter(supabaseDiagnosticApi)

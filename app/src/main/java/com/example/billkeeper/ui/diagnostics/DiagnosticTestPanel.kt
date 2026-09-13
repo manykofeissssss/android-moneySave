@@ -21,8 +21,12 @@ internal fun DiagnosticTestPanel(
     onCrash: () -> Unit,
     onAnr: () -> Unit,
     onUiBlock: () -> Unit,
+    onSyntheticCrash: () -> Unit,
+    onSyntheticAnr: () -> Unit,
+    onSyntheticUiBlock: () -> Unit,
     onRefresh: () -> Unit,
     onUpload: () -> Unit,
+    onRetryFailed: () -> Unit,
     onDeletePending: () -> Unit
 ) {
     if (!com.example.billkeeper.BuildConfig.DEBUG) return
@@ -51,10 +55,22 @@ internal fun DiagnosticTestPanel(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onUiBlock) { Text("测试卡顿") }
-                Button(onClick = onRefresh) { Text("刷新") }
+                Button(onClick = onSyntheticCrash) { Text("写入 Crash") }
+            }
+            Text(
+                "以下按钮只写入本地事件，不会退出应用，适合验证上传和重试。",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onSyntheticAnr) { Text("写入 ANR") }
+                Button(onClick = onSyntheticUiBlock) { Text("写入 UI_BLOCK") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRefresh) { Text("刷新") }
                 Button(onClick = onUpload) { Text("触发上传") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRetryFailed) { Text("重试失败") }
                 Button(onClick = onDeletePending) { Text("清理待处理") }
             }
         }

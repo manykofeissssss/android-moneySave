@@ -43,7 +43,7 @@ fun BillKeeperApp(
     appearancePreferences: AppearancePreferences,
     darkTheme: Boolean,
     diagnostics: DiagnosticsHandle,
-    onEnqueueDiagnosticUpload: () -> Unit
+    onEnqueueDiagnosticUpload: (includeCrash: Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val backgroundPreferences = remember(context) { BackgroundPreferences(context) }
@@ -70,7 +70,7 @@ fun BillKeeperApp(
                         it.type != DiagnosticEventType.CRASH
                 }
             ) {
-                onEnqueueDiagnosticUpload()
+                onEnqueueDiagnosticUpload(false)
             }
         }
     }
@@ -133,7 +133,7 @@ fun BillKeeperApp(
                 refreshDiagnostics()
             },
             onRefresh = refreshDiagnostics,
-            onUpload = onEnqueueDiagnosticUpload,
+            onUpload = { onEnqueueDiagnosticUpload(false) },
             onRetryFailed = {
                 diagnosticEvents
                     .filter { it.status == DiagnosticStatus.FAILED }
@@ -146,7 +146,7 @@ fun BillKeeperApp(
                         )
                     }
                 refreshDiagnostics()
-                onEnqueueDiagnosticUpload()
+                onEnqueueDiagnosticUpload(false)
             },
             onDeletePending = {
                 diagnosticEvents
@@ -165,7 +165,7 @@ fun BillKeeperApp(
                 CrashReportDialog(
                     event = event,
                     onUpload = {
-                        onEnqueueDiagnosticUpload()
+                        onEnqueueDiagnosticUpload(true)
                         crashDialogDismissed = true
                     },
                     onDiscard = {

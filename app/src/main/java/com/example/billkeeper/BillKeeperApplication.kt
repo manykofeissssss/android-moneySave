@@ -51,8 +51,15 @@ class BillKeeperApplication : Application() {
         recurringScheduler.enqueueImmediateCheck()
     }
 
-    fun enqueueDiagnosticUpload() {
-        DiagnosticUploadScheduler.enqueue(this)
+    fun enqueueDiagnosticUpload(includeCrash: Boolean = false) {
+        DiagnosticUploadScheduler.enqueue(
+            context = this,
+            includeCrash = includeCrash,
+            // A crash consent must upgrade an already queued non-crash upload.
+            // Replacing the same unique work also prevents two workers from
+            // uploading the same non-crash batch concurrently.
+            replaceExisting = includeCrash
+        )
     }
 
     private fun enqueuePendingNonCrashDiagnostics() {

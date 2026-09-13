@@ -14,6 +14,8 @@ import io.github.manykofeissssss.kdiagnostics.android.runtime.Diagnostics
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsConfig
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsHandle
 import io.github.manykofeissssss.kdiagnostics.core.api.DiagnosticReporter
+import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEventType
+import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticStatus
 import io.github.manykofeissssss.kdiagnostics.work.DiagnosticUploadRegistry
 import io.github.manykofeissssss.kdiagnostics.work.DiagnosticUploadScheduler
 
@@ -42,6 +44,7 @@ class BillKeeperApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DiagnosticUploadRegistry.configure(diagnostics.store, diagnosticReporter)
+        enqueuePendingNonCrashDiagnostics()
         ReminderNotifications.createChannel(this)
         ReminderScheduler(this).syncSchedules()
         recurringScheduler.startPeriodicChecks()
@@ -50,6 +53,13 @@ class BillKeeperApplication : Application() {
 
     fun enqueueDiagnosticUpload() {
         DiagnosticUploadScheduler.enqueue(this)
+    }
+
+    private fun enqueuePendingNonCrashDiagnostics() {
+        val hasPendingNonCrash = diagnostics.store
+            .list(DiagnosticStatus.PENDING)
+            .any { it.type != DiagnosticEventType.CRASH }
+        if (hasPendingNonCrash) enqueueDiagnosticUpload()
     }
 
     val database: AppDatabase by lazy {

@@ -42,6 +42,14 @@ internal fun DiagnosticTestPanel(
         ) {
             Text("Diagnostics 测试入口", style = MaterialTheme.typography.titleMedium)
             Text(
+                if (com.example.billkeeper.BuildConfig.SUPABASE_URL.isBlank()) {
+                    "Supabase：未配置"
+                } else {
+                    "Supabase：已配置"
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
                 "总计 ${summary.total} · Crash ${summary.crash} · ANR ${summary.anr} · " +
                     "UI_BLOCK ${summary.uiBlock}"
             )

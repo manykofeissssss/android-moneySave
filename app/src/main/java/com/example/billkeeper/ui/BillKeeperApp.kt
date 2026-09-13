@@ -61,7 +61,17 @@ fun BillKeeperApp(
     LaunchedEffect(diagnostics) {
         while (true) {
             delay(1_000L)
-            refreshDiagnostics()
+            val latestEvents = diagnostics.store.list()
+            diagnosticEvents = latestEvents
+            // Crash uploads remain user-consent driven by CrashReportDialog;
+            // ANR/UI_BLOCK events can be queued automatically in the background.
+            if (latestEvents.any {
+                    it.status == DiagnosticStatus.PENDING &&
+                        it.type != DiagnosticEventType.CRASH
+                }
+            ) {
+                onEnqueueDiagnosticUpload()
+            }
         }
     }
 

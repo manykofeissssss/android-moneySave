@@ -57,6 +57,16 @@ internal fun DiagnosticTestPanel(
                 "PENDING ${summary.pending} · UPLOADING ${summary.uploading} · " +
                     "FAILED ${summary.failed} · REPORTED ${summary.reported}"
             )
+            if (summary.maxRetryCount > 0) {
+                Text("最大重试次数：${summary.maxRetryCount}")
+            }
+            summary.lastError?.let { error ->
+                Text(
+                    "最近失败原因：$error",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onCrash) { Text("测试崩溃") }
                 Button(onClick = onAnr) { Text("测试 ANR") }

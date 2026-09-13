@@ -12,7 +12,9 @@ data class DiagnosticEventSummary(
     val pending: Int,
     val uploading: Int,
     val failed: Int,
-    val reported: Int
+    val reported: Int,
+    val maxRetryCount: Int,
+    val lastError: String?
 ) {
     companion object {
         fun from(events: List<DiagnosticEvent>): DiagnosticEventSummary = DiagnosticEventSummary(
@@ -23,7 +25,11 @@ data class DiagnosticEventSummary(
             pending = events.count { it.status == DiagnosticStatus.PENDING },
             uploading = events.count { it.status == DiagnosticStatus.UPLOADING },
             failed = events.count { it.status == DiagnosticStatus.FAILED },
-            reported = events.count { it.status == DiagnosticStatus.REPORTED }
+            reported = events.count { it.status == DiagnosticStatus.REPORTED },
+            maxRetryCount = events.maxOfOrNull { it.retryCount } ?: 0,
+            lastError = events.asSequence()
+                .mapNotNull { it.lastError }
+                .lastOrNull()
         )
     }
 }

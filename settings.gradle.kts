@@ -30,3 +30,12 @@ includeBuild("D:/CreateByCodex/2026-08-24/SharedNav")
             .using(project(":navigation"))
     }
 }
+
+includeBuild("D:/CreateByCodex/2026-09-12/k-diagnostics") {
+    dependencySubstitution {
+        substitute(module("io.github.manykofeissssss.kdiagnostics:diagnostics-android"))
+            .using(project(":diagnostics-android"))
+        substitute(module("io.github.manykofeissssss.kdiagnostics:diagnostics-work"))
+            .using(project(":diagnostics-work"))
+    }
+}

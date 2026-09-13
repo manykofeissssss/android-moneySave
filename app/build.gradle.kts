@@ -38,6 +38,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     sourceSets {
@@ -51,6 +52,9 @@ ksp {
 }
 
 dependencies {
+    implementation("io.github.manykofeissssss.kdiagnostics:diagnostics-android:0.1.0-alpha01")
+    implementation("io.github.manykofeissssss.kdiagnostics:diagnostics-work:0.1.0-alpha01")
+
     val composeBom = platform("androidx.compose:compose-bom:2025.11.01")
     implementation(composeBom)
 

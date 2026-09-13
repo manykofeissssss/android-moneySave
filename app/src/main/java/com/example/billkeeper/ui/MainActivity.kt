@@ -16,6 +16,7 @@ import com.example.billkeeper.viewmodel.LedgerViewModelFactory
 import com.example.billkeeper.viewmodel.DailyLedgerViewModel
 import com.example.billkeeper.viewmodel.DailyLedgerViewModelFactory
 import com.example.billkeeper.viewmodel.RecurringEntryViewModel
+import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsHandle
 import com.example.billkeeper.viewmodel.RecurringEntryViewModelFactory
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,13 +57,16 @@ class MainActivity : ComponentActivity() {
                 if (showSplash) {
                     SplashScreen(onFinish = { showSplash = false })
                 } else {
+                    val app = application as BillKeeperApplication
                     BillKeeperApp(
                         vm = vm,
                         recurringVm = recurringVm,
                         dailyLedgerVm = dailyLedgerVm,
                         appearanceSettings = appearanceSettings,
                         appearancePreferences = appearancePreferences,
-                        darkTheme = darkTheme
+                        darkTheme = darkTheme,
+                        diagnostics = app.diagnostics,
+                        onEnqueueDiagnosticUpload = app::enqueueDiagnosticUpload
                     )
                 }
             }

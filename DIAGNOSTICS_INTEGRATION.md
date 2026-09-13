@@ -71,7 +71,7 @@ create policy "diagnostic clients can only insert"
     );
 ```
 
-`event_id` 是幂等主键；客户端重试不会产生重复诊断记录。当前直接 Data API
+`event_id` 是幂等主键；客户端使用普通 insert，重复主键返回 409 时按成功处理，因此重试不会产生重复诊断记录。当前直接 Data API
 方案适合第一版真机验证，正式发布前建议改为 Edge Function 入口并增加限流。
 
 ## 相关接入文件

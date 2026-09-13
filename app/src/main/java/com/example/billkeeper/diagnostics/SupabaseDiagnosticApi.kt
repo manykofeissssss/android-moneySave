@@ -93,12 +93,10 @@ class SupabaseRestDiagnosticApi(
             connection.setRequestProperty("Authorization", "Bearer $publishableKey")
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
-            // Duplicate event IDs are considered success, which makes a
-            // WorkManager retry idempotent after a process/network interruption.
-            connection.setRequestProperty(
-                "Prefer",
-                "resolution=ignore-duplicates,return=minimal"
-            )
+            // Use a plain insert so the anon role only needs INSERT. A
+            // duplicate primary key (409) is handled as idempotent success
+            // below, avoiding the SELECT privilege required by upsert.
+            connection.setRequestProperty("Prefer", "return=minimal")
 
             val body = JSONArray().apply {
                 events.forEach { put(it.toSupabaseRecord()) }

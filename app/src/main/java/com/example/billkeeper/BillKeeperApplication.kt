@@ -27,7 +27,12 @@ class BillKeeperApplication : Application() {
                 enableAnrWatchdog = true,
                 enableUiBlockMonitor = BuildConfig.DEBUG,
                 anrTimeoutMillis = 5_000L,
-                uiBlockThresholdMillis = 250L,
+                uiBlockThresholdMillis = 500L,
+                // BK keeps its custom splash visible for three seconds; allow
+                // the first business screen to settle before measuring stalls.
+                uiBlockForegroundGraceMillis = 5_000L,
+                uiBlockCooldownMillis = 60_000L,
+                uiBlockMaxEventsPerSession = 5,
                 debuggerAware = true
             )
         )

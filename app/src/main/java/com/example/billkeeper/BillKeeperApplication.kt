@@ -8,13 +8,13 @@ import com.example.billkeeper.data.repository.LedgerRepository
 import com.example.billkeeper.diagnostics.BillKeeperDiagnosticReporter
 import com.example.billkeeper.diagnostics.SupabaseDiagnosticApi
 import com.example.billkeeper.diagnostics.SupabaseDiagnosticApiProvider
+import com.example.billkeeper.diagnostics.isPendingAutomaticUpload
 import com.example.billkeeper.notification.ReminderNotifications
 import com.example.billkeeper.notification.ReminderScheduler
 import io.github.manykofeissssss.kdiagnostics.android.runtime.Diagnostics
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsConfig
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsHandle
 import io.github.manykofeissssss.kdiagnostics.core.api.DiagnosticReporter
-import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEventType
 import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticStatus
 import io.github.manykofeissssss.kdiagnostics.work.DiagnosticUploadRegistry
 import io.github.manykofeissssss.kdiagnostics.work.DiagnosticUploadScheduler
@@ -50,7 +50,7 @@ class BillKeeperApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DiagnosticUploadRegistry.configure(diagnostics.store, diagnosticReporter)
-        enqueuePendingNonCrashDiagnostics()
+        enqueuePendingAutomaticDiagnostics()
         ReminderNotifications.createChannel(this)
         ReminderScheduler(this).syncSchedules()
         recurringScheduler.startPeriodicChecks()
@@ -68,11 +68,11 @@ class BillKeeperApplication : Application() {
         )
     }
 
-    private fun enqueuePendingNonCrashDiagnostics() {
-        val hasPendingNonCrash = diagnostics.store
+    private fun enqueuePendingAutomaticDiagnostics() {
+        val hasPendingAutomaticEvent = diagnostics.store
             .list(DiagnosticStatus.PENDING)
-            .any { it.type != DiagnosticEventType.CRASH }
-        if (hasPendingNonCrash) enqueueDiagnosticUpload()
+            .any { it.isPendingAutomaticUpload() }
+        if (hasPendingAutomaticEvent) enqueueDiagnosticUpload()
     }
 
     val database: AppDatabase by lazy {

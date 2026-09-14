@@ -21,6 +21,10 @@ import com.example.billkeeper.background.AppearancePreferences
 import com.example.billkeeper.background.AppearanceSettings
 import com.example.billkeeper.background.BackgroundPreferences
 import com.example.billkeeper.diagnostics.DiagnosticEventSummary
+import com.example.billkeeper.diagnostics.SYNTHETIC_EVENT_METADATA_KEY
+import com.example.billkeeper.diagnostics.isPendingAutomaticCrashPrompt
+import com.example.billkeeper.diagnostics.isPendingAutomaticUpload
+import com.example.billkeeper.diagnostics.isPendingSyntheticConsentEvent
 import com.example.billkeeper.ui.background.AppBackground
 import com.example.billkeeper.ui.diagnostics.DiagnosticTestPanel
 import com.example.billkeeper.ui.navigation.BillKeeperNavigation
@@ -30,7 +34,6 @@ import com.example.billkeeper.viewmodel.RecurringEntryViewModel
 import io.github.manykofeissssss.kdiagnostics.android.runtime.DiagnosticsHandle
 import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEvent
 import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticEventType
-import io.github.manykofeissssss.kdiagnostics.core.model.DiagnosticStatus
 import kotlinx.coroutines.delay
 import java.util.UUID
 
@@ -50,7 +53,8 @@ fun BillKeeperApp(
     val snackbarHostState = remember { SnackbarHostState() }
     var backgroundRevision by remember { mutableIntStateOf(0) }
     var diagnosticEvents by remember { mutableStateOf(diagnostics.store.list()) }
-    var crashDialogDismissed by remember { mutableStateOf(false) }
+    var dismissedConsentEventIds by remember { mutableStateOf(emptySet<String>()) }
+    var selectedSyntheticEventId by remember { mutableStateOf<String?>(null) }
     val diagnosticSummary = remember(diagnosticEvents) {
         DiagnosticEventSummary.from(diagnosticEvents)
     }
@@ -63,13 +67,9 @@ fun BillKeeperApp(
             delay(1_000L)
             val latestEvents = diagnostics.store.list()
             diagnosticEvents = latestEvents
-            // Crash uploads remain user-consent driven by CrashReportDialog;
-            // ANR/UI_BLOCK events can be queued automatically in the background.
-            if (latestEvents.any {
-                    it.status == DiagnosticStatus.PENDING &&
-                        it.type != DiagnosticEventType.CRASH
-                }
-            ) {
+            // Real ANR/UI_BLOCK events can upload automatically. Crash events and
+            // synthetic Crash/ANR events remain behind the shared consent prompt.
+            if (latestEvents.any { it.isPendingAutomaticUpload() }) {
                 onEnqueueDiagnosticUpload(false)
             }
         }
@@ -132,48 +132,49 @@ fun BillKeeperApp(
                 appendSyntheticDiagnosticEvent(diagnostics, DiagnosticEventType.UI_BLOCK)
                 refreshDiagnostics()
             },
-            onRefresh = refreshDiagnostics,
-            onUpload = { onEnqueueDiagnosticUpload(false) },
-            onRetryFailed = {
+            canSubmitSynthetic = diagnosticEvents.any { it.isPendingSyntheticConsentEvent() },
+            onSubmitSynthetic = {
                 diagnosticEvents
-                    .filter { it.status == DiagnosticStatus.FAILED }
-                    .forEach {
-                        diagnostics.store.save(
-                            it.copy(
-                                status = DiagnosticStatus.PENDING,
-                                lastError = null
-                            )
-                        )
+                    .firstOrNull { it.isPendingSyntheticConsentEvent() }
+                    ?.let { event ->
+                        dismissedConsentEventIds -= event.eventId
+                        selectedSyntheticEventId = event.eventId
                     }
-                refreshDiagnostics()
-                onEnqueueDiagnosticUpload(false)
-            },
-            onDeletePending = {
-                diagnosticEvents
-                    .filter { it.status == DiagnosticStatus.PENDING }
-                    .forEach { diagnostics.store.remove(it.eventId) }
-                refreshDiagnostics()
             }
         )
-        diagnosticEvents
-            .firstOrNull {
-                it.type == DiagnosticEventType.CRASH &&
-                    it.status == DiagnosticStatus.PENDING
+        val automaticCrashPrompt = diagnosticEvents.firstOrNull {
+            it.isPendingAutomaticCrashPrompt() && it.eventId !in dismissedConsentEventIds
+        }
+        val selectedSyntheticPrompt = selectedSyntheticEventId?.let { selectedId ->
+            diagnosticEvents.firstOrNull {
+                it.eventId == selectedId && it.isPendingSyntheticConsentEvent()
             }
-            ?.takeUnless { crashDialogDismissed }
+        }
+        (automaticCrashPrompt ?: selectedSyntheticPrompt)
             ?.let { event ->
                 CrashReportDialog(
                     event = event,
                     onUpload = {
+                        dismissedConsentEventIds += event.eventId
+                        if (selectedSyntheticEventId == event.eventId) {
+                            selectedSyntheticEventId = null
+                        }
                         onEnqueueDiagnosticUpload(true)
-                        crashDialogDismissed = true
                     },
                     onDiscard = {
                         diagnostics.store.remove(event.eventId)
-                        crashDialogDismissed = true
+                        dismissedConsentEventIds += event.eventId
+                        if (selectedSyntheticEventId == event.eventId) {
+                            selectedSyntheticEventId = null
+                        }
                         refreshDiagnostics()
                     },
-                    onLater = { crashDialogDismissed = true }
+                    onLater = {
+                        dismissedConsentEventIds += event.eventId
+                        if (selectedSyntheticEventId == event.eventId) {
+                            selectedSyntheticEventId = null
+                        }
+                    }
                 )
             }
     }
@@ -200,10 +201,13 @@ private fun appendSyntheticDiagnosticEvent(
             },
             message = "Synthetic ${type.name} event from DiagnosticsTestPanel",
             stackTrace = "Synthetic stack trace; no process crash was triggered.",
-            metadata = mapOf(
-                "source" to "billkeeper-debug-panel",
-                "synthetic" to "true"
-            )
+            metadata = buildMap {
+                put("source", "billkeeper-debug-panel")
+                put(SYNTHETIC_EVENT_METADATA_KEY, "true")
+                if (type != DiagnosticEventType.UI_BLOCK) {
+                    put(DiagnosticEvent.REQUIRES_USER_CONSENT_METADATA_KEY, "true")
+                }
+            }
         )
     )
 }

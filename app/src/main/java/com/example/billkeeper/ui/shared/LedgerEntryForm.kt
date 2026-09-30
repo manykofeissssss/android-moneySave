@@ -174,7 +174,21 @@ fun LedgerEntryForm(
                         amountError = "请输入大于 0 的有效金额"
                     } else {
                         val entryDate = if (allowDateSelection) {
-                            selectedDate.withTimeFrom(System.currentTimeMillis())
+                            val selectedLocalDate = Instant.ofEpochMilli(selectedDate)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                            val isToday = selectedLocalDate == LocalDate.now()
+                            
+                            if (isToday) {
+                                // 今天的账单，使用当前时刻
+                                System.currentTimeMillis()
+                            } else {
+                                // 补记，统一为当天 12:00
+                                selectedLocalDate.atTime(12, 0)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toInstant()
+                                    .toEpochMilli()
+                            }
                         } else {
                             System.currentTimeMillis()
                         }
@@ -196,7 +210,16 @@ fun LedgerEntryForm(
     }
 
     if (allowDateSelection && showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis())
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis(),
+            selectableDates = object : androidx.compose.material3.SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val date = Instant.ofEpochMilli(utcTimeMillis)
+                        .atZone(ZoneOffset.UTC).toLocalDate()
+                    return !date.isAfter(LocalDate.now())
+                }
+            }
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {

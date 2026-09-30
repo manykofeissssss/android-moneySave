@@ -236,8 +236,12 @@ private fun DailyEntryRow(entry: DailyEntryItem) {
     ListItem(
         headlineContent = { Text(title, fontWeight = FontWeight.Medium) },
         supportingContent = {
+            val timeStr = timeFormatter.format(Date(entry.timestamp))
+            val isRetroactive = isRetroactiveEntry(entry.timestamp)
+            val prefix = if (isRetroactive) "补记 · " else ""
+            
             Text(
-                listOf(timeFormatter.format(Date(entry.timestamp)), note)
+                listOf(prefix + timeStr, note)
                     .filter { it.isNotBlank() }
                     .joinToString(" · ")
             )
@@ -265,4 +269,12 @@ private fun DailyEntryRow(entry: DailyEntryItem) {
         },
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+private fun isRetroactiveEntry(timestamp: Long): Boolean {
+    val time = Instant.ofEpochMilli(timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalTime()
+    // 判断时间是否恰好是 12:00:00
+    return time.hour == 12 && time.minute == 0 && time.second == 0
 }

@@ -103,6 +103,8 @@ fun BillRow(
 ) {
     val color = CATEGORY_COLORS[bill.category] ?: MaterialTheme.colorScheme.outline
     val df = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
+    val isRetroactive = isRetroactiveEntry(bill.date)
+    
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -115,7 +117,9 @@ fun BillRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(bill.category, fontWeight = FontWeight.Medium, fontSize = 15.sp)
                 if (bill.note.isNotBlank()) Text(bill.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(df.format(Date(bill.date)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                val timeStr = df.format(Date(bill.date))
+                val prefix = if (isRetroactive) "补记 " else ""
+                Text("$prefix$timeStr", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
             Text("- ${formatCurrency(bill.amountCents)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
             Spacer(Modifier.width(4.dp))
@@ -129,6 +133,14 @@ fun BillRow(
     }
 }
 
+private fun isRetroactiveEntry(timestamp: Long): Boolean {
+    val time = java.time.Instant.ofEpochMilli(timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalTime()
+    // 判断时间是否恰好是 12:00:00
+    return time.hour == 12 && time.minute == 0 && time.second == 0
+}
+
 @Composable
 fun IncomeRow(
     income: IncomeItem,
@@ -136,6 +148,8 @@ fun IncomeRow(
     onDelete: (IncomeItem) -> Unit
 ) {
     val df = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
+    val isRetroactive = isRetroactiveEntry(income.date)
+    
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -148,7 +162,9 @@ fun IncomeRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(income.source, fontWeight = FontWeight.Medium, fontSize = 15.sp)
                 if (income.note.isNotBlank()) Text(income.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(df.format(Date(income.date)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                val timeStr = df.format(Date(income.date))
+                val prefix = if (isRetroactive) "补记 " else ""
+                Text("$prefix$timeStr", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
             Text("+ ${formatCurrency(income.amountCents)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
             Spacer(Modifier.width(4.dp))

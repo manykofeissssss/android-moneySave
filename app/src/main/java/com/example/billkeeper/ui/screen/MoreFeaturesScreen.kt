@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Repeat
@@ -25,7 +26,8 @@ fun MoreFeaturesScreen(
     onOpenDailyLedger: () -> Unit,
     onOpenRecurringEntries: () -> Unit,
     onOpenReminderSettings: () -> Unit,
-    onOpenAppearanceSettings: () -> Unit
+    onOpenAppearanceSettings: () -> Unit,
+    onOpenCurrentFunds: () -> Unit
 ) {
     val features = listOf(
         FeatureItem(
@@ -51,6 +53,12 @@ fun MoreFeaturesScreen(
             description = "调整主题色、背景色和背景图片",
             icon = Icons.Default.Palette,
             onClick = onOpenAppearanceSettings
+        ),
+        FeatureItem(
+            title = "现有资金",
+            description = "修改当前现有资金金额",
+            icon = Icons.Default.AccountBalanceWallet,
+            onClick = onOpenCurrentFunds
         )
     )
 

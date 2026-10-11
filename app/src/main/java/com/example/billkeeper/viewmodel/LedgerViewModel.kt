@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.billkeeper.data.local.entity.BillItem
+import com.example.billkeeper.data.local.entity.CurrentFunds
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.model.CategorySummary
 import com.example.billkeeper.data.repository.LedgerRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -46,6 +48,11 @@ data class BudgetProgressUi(
     val isOverBudget: Boolean
 )
 
+data class CategoryExpensesUiState(val bills: List<BillItem>) {
+    val totalExpenseCents: Long get() = bills.sumOf { it.amountCents }
+    val entryCount: Int get() = bills.size
+}
+
 sealed interface DeletedLedgerEntry {
     data class Bill(val item: BillItem) : DeletedLedgerEntry
     data class Income(val item: IncomeItem) : DeletedLedgerEntry
@@ -65,6 +72,21 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
     val categorySummary: Flow<List<CategorySummary>> = repo.categorySummary
     val totalExpense: Flow<Long> = repo.totalExpense
     val totalIncome: Flow<Long> = repo.totalIncome
+
+    private val currentFundsState: StateFlow<CurrentFunds?> = repo.currentFunds
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val currentFunds: StateFlow<Long> = currentFundsState
+        .map { it?.amountCents ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val remainingFundsCents: StateFlow<Long> = combine(
+        currentFundsState,
+        totalIncome,
+        totalExpense
+    ) { funds, incomeCents, expenseCents ->
+        calculateRemainingFunds(funds, incomeCents, expenseCents)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     private val calendar = Calendar.getInstance()
     private val _selectedYear = MutableStateFlow(calendar.get(Calendar.YEAR))
@@ -108,6 +130,17 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
     val monthlyBills: StateFlow<List<BillItem>> = monthRange.flatMapLatest { (start, endExclusive) ->
         repo.getBillsByMonth(start, endExclusive)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun observeCategoryExpenses(
+        category: String,
+        year: Int,
+        month: Int
+    ): Flow<CategoryExpensesUiState> {
+        val (start, endExclusive) = monthRangeMillis(year, month - 1)
+        return repo.getBillsByMonth(start, endExclusive).map { bills ->
+            categoryExpensesUiState(bills, category)
+        }
+    }
 
     val monthlyCategorySummary: StateFlow<List<CategorySummary>> = monthlyBills.map { bills ->
         bills.groupBy { it.category }
@@ -222,6 +255,25 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
 
     private val _snackbarEvents = MutableSharedFlow<LedgerSnackbarEvent>()
     val snackbarEvents: SharedFlow<LedgerSnackbarEvent> = _snackbarEvents.asSharedFlow()
+
+    fun updateCurrentFunds(amountCents: Long) {
+        viewModelScope.launch {
+            try {
+                val incomeSnapshotCents = repo.totalIncome.first()
+                val expenseSnapshotCents = repo.totalExpense.first()
+                repo.saveCurrentFunds(
+                    CurrentFunds(
+                        amountCents = amountCents,
+                        incomeSnapshotCents = incomeSnapshotCents,
+                        expenseSnapshotCents = expenseSnapshotCents
+                    )
+                )
+                _snackbarEvents.emit(LedgerSnackbarEvent("现有资金已更新"))
+            } catch (e: Exception) {
+                _snackbarEvents.emit(LedgerSnackbarEvent("更新失败：${e.localizedMessage ?: "未知错误"}"))
+            }
+        }
+    }
 
     fun setBudget(
         category: String,
@@ -416,6 +468,23 @@ internal fun monthRangeMillis(
     val endExclusive = month.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     return start to endExclusive
 }
+
+internal fun calculateRemainingFunds(
+    funds: CurrentFunds?,
+    currentIncomeCents: Long,
+    currentExpenseCents: Long
+): Long = funds?.let {
+    it.amountCents + (currentIncomeCents - it.incomeSnapshotCents) -
+        (currentExpenseCents - it.expenseSnapshotCents)
+} ?: 0L
+
+internal fun categoryExpensesUiState(
+    monthlyBills: List<BillItem>,
+    category: String
+): CategoryExpensesUiState = CategoryExpensesUiState(
+    bills = monthlyBills.filter { it.category == category }
+        .sortedWith(compareByDescending<BillItem> { it.date }.thenByDescending { it.id })
+)
 
 internal fun yearMonthForMillis(
     timestamp: Long,

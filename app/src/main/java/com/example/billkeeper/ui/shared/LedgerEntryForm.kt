@@ -1,5 +1,6 @@
 package com.example.billkeeper.ui.shared
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,10 +33,12 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.billkeeper.data.model.parseYuanToCents
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -65,6 +70,7 @@ fun LedgerEntryForm(
     options: List<String>,
     actionColor: Color,
     allowDateSelection: Boolean = true,
+    enableTimeSelection: Boolean = false,
     showTitle: Boolean = true,
     onInputFocus: () -> Unit = {},
     onSubmit: (option: String, amountCents: Long, note: String, date: Long) -> Unit
@@ -78,9 +84,27 @@ fun LedgerEntryForm(
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableLongStateOf(todayStartOfDayMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var selectedTime by remember { mutableStateOf(LocalTime.now()) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.getDefault()) }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
+    val selectedLocalDate = remember(selectedDate) {
+        Instant.ofEpochMilli(selectedDate).atZone(ZoneId.systemDefault()).toLocalDate()
+    }
+    val isToday = selectedLocalDate == LocalDate.now()
     val selectedDateText = remember(selectedDate) {
         Instant.ofEpochMilli(selectedDate).atZone(ZoneId.systemDefault()).toLocalDate().format(dateFormatter)
+    }
+    val selectedTimeText = selectedTime.format(timeFormatter)
+    val context = LocalContext.current
+
+    LaunchedEffect(isToday, enableTimeSelection) {
+        if (enableTimeSelection) {
+            selectedTime = if (isToday) {
+                LocalTime.now()
+            } else {
+                LocalTime.NOON
+            }
+        }
     }
 
     Card(
@@ -154,6 +178,84 @@ fun LedgerEntryForm(
                         Icon(Icons.Default.Edit, contentDescription = "选择日期", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
                 }
+
+                if (enableTimeSelection) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                selectedTime = LocalTime.now()
+                            },
+                            enabled = isToday,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = actionColor,
+                                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("当前时间")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        selectedTime = LocalTime.of(hour, minute)
+                                    },
+                                    selectedTime.hour,
+                                    selectedTime.minute,
+                                    true
+                                ).show()
+                            },
+                            enabled = isToday,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = actionColor,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = if (isToday) actionColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("选择时间")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                1.dp,
+                                if (isToday) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "时间",
+                                color = if (isToday) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = if (isToday) selectedTimeText else "$selectedTimeText（补记）",
+                                color = if (isToday) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -174,21 +276,12 @@ fun LedgerEntryForm(
                         amountError = "请输入大于 0 的有效金额"
                     } else {
                         val entryDate = if (allowDateSelection) {
-                            val selectedLocalDate = Instant.ofEpochMilli(selectedDate)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            val isToday = selectedLocalDate == LocalDate.now()
-                            
-                            if (isToday) {
-                                // 今天的账单，使用当前时刻
-                                System.currentTimeMillis()
-                            } else {
-                                // 补记，统一为当天 12:00
-                                selectedLocalDate.atTime(12, 0)
-                                    .atZone(ZoneId.systemDefault())
-                                    .toInstant()
-                                    .toEpochMilli()
+                            val entryTime = when {
+                                enableTimeSelection && isToday -> selectedTime
+                                !isToday -> LocalTime.NOON
+                                else -> LocalTime.now()
                             }
+                            selectedDate.withLocalTime(entryTime)
                         } else {
                             System.currentTimeMillis()
                         }
@@ -196,6 +289,7 @@ fun LedgerEntryForm(
                         amountText = ""
                         noteText = ""
                         selectedDate = todayStartOfDayMillis()
+                        selectedTime = LocalTime.now()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -235,6 +329,7 @@ fun LedgerEntryForm(
             DatePicker(state = datePickerState)
         }
     }
+
 }
 
 internal fun Long.withTimeFrom(
@@ -248,6 +343,20 @@ internal fun Long.withTimeFrom(
     val time = Instant.ofEpochMilli(timeSourceMillis)
         .atZone(zoneId)
         .toLocalTime()
+
+    return date.atTime(time)
+        .atZone(zoneId)
+        .toInstant()
+        .toEpochMilli()
+}
+
+internal fun Long.withLocalTime(
+    time: LocalTime,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Long {
+    val date = Instant.ofEpochMilli(this)
+        .atZone(zoneId)
+        .toLocalDate()
 
     return date.atTime(time)
         .atZone(zoneId)

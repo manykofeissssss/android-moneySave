@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.billkeeper.data.model.formatCurrency
 import com.example.billkeeper.ui.shared.CategoryRow
+import com.example.billkeeper.ui.shared.BillRow
 import com.example.billkeeper.ui.shared.LedgerEntryForm
 import com.example.billkeeper.ui.theme.EXPENSE_CATEGORIES
 import com.example.billkeeper.ui.theme.INCOME_SOURCES
@@ -71,9 +73,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import com.example.billkeeper.viewmodel.BudgetProgressUi
+import com.example.billkeeper.viewmodel.CategoryExpensesUiState
 
 @Composable
-fun ExpenseSummaryTab(vm: LedgerViewModel) {
+fun ExpenseSummaryTab(vm: LedgerViewModel, onOpenCategoryExpenses: (String) -> Unit) {
     val uiState by vm.monthlyUiState.collectAsStateWithLifecycle()
     val budgetProgress by vm.monthlyBudgetProgress.collectAsStateWithLifecycle()
     var showQuickEntry by rememberSaveable { mutableStateOf(false) }
@@ -82,13 +85,16 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
     var categorySummaryExpanded by rememberSaveable { mutableStateOf(false) }
     val monthlyTotalExp = uiState.totalExpenseCents
     val monthlyTotalInc = uiState.totalIncomeCents
+    val remainingFundsCents by vm.remainingFundsCents.collectAsStateWithLifecycle()
     val prevMonthExp = uiState.prevMonthExpenseCents
+    val listState = rememberLazyListState()
 
 
     val momChange = if (prevMonthExp > 0) monthlyTotalExp - prevMonthExp else 0L
     val momPercent = if (prevMonthExp > 0) (momChange.toDouble() / prevMonthExp) * 100 else 0.0
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -99,45 +105,71 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("月度支出", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), fontSize = 14.sp)
-                    Text(
-                        formatCurrency(monthlyTotalExp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Text("月度支出", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), fontSize = 14.sp)
                         Text(
-                            "共 ${uiState.bills.size} 笔",
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
-                            fontSize = 13.sp
+                            formatCurrency(monthlyTotalExp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        if (monthlyTotalInc > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
                             Text(
-                                "  |  收入 ${formatCurrency(monthlyTotalInc)}",
+                                "共 ${uiState.bills.size} 笔",
                                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                                 fontSize = 13.sp
                             )
+                            if (monthlyTotalInc > 0) {
+                                Text(
+                                    "  |  收入 ${formatCurrency(monthlyTotalInc)}",
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
+                        Text(
+                            "本月结余 ${formatCurrency(monthlyTotalInc - monthlyTotalExp)}",
+                            color = if (monthlyTotalInc - monthlyTotalExp >= 0) {
+                                Color(0xFFA5D6A7)
+                            } else {
+                                Color(0xFFEF9A9A)
+                            },
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
-                    Text(
-                        "结余 ${formatCurrency(monthlyTotalInc - monthlyTotalExp)}",
-                        color = if (monthlyTotalInc - monthlyTotalExp >= 0) {
-                            Color(0xFFA5D6A7)
-                        } else {
-                            Color(0xFFEF9A9A)
-                        },
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(start = 16.dp)
+                    ) {
+                        Text(
+                            "资金剩余",
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            formatCurrency(remainingFundsCents),
+                            color = if (remainingFundsCents >= 0) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                Color(0xFFFFCDD2)
+                            },
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -235,7 +267,9 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             if (uiState.categorySummary.isEmpty()) {
                 item { Text("暂无支出记录", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp)) }
             } else {
-                items(uiState.categorySummary, key = { it.category }) { cat -> CategoryRow(cat) }
+                items(uiState.categorySummary, key = { it.category }) { cat ->
+                    CategoryRow(cat, onClick = { onOpenCategoryExpenses(cat.category) })
+                }
             }
         }
     }
@@ -261,6 +295,56 @@ fun ExpenseSummaryTab(vm: LedgerViewModel) {
             },
             onDismiss = { budgetToDelete = null }
         )
+    }
+}
+
+@Composable
+fun CategoryExpensesScreen(vm: LedgerViewModel, category: String, year: Int, month: Int) {
+    val expensesFlow = remember(vm, category, year, month) {
+        vm.observeCategoryExpenses(category, year, month)
+    }
+    val uiState by expensesFlow.collectAsStateWithLifecycle<CategoryExpensesUiState?>(initialValue = null)
+    val state = uiState
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
+            Text("${year}年${month}月", style = MaterialTheme.typography.titleMedium)
+        }
+        if (state == null) {
+            item { Text("正在加载…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            item {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("${category}支出合计", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            formatCurrency(state.totalExpenseCents),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text("共 ${state.entryCount} 笔", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (state.bills.isEmpty()) {
+                item {
+                    Text(
+                        "该月暂无此类支出",
+                        modifier = Modifier.padding(vertical = 20.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                items(state.bills, key = { it.id }) { bill -> BillRow(bill = bill) }
+            }
+        }
     }
 }
 

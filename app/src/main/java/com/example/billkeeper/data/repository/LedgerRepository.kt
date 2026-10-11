@@ -3,6 +3,7 @@ package com.example.billkeeper.data.repository
 import androidx.room.withTransaction
 import com.example.billkeeper.data.local.db.AppDatabase
 import com.example.billkeeper.data.local.entity.BillItem
+import com.example.billkeeper.data.local.entity.CurrentFunds
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.local.entity.MonthlyBudget
 import com.example.billkeeper.data.local.entity.RecurringEntry
@@ -14,6 +15,10 @@ class LedgerRepository(private val db: AppDatabase) {
     val allBills: Flow<List<BillItem>> = db.billDao().getAll()
     val categorySummary: Flow<List<CategorySummary>> = db.billDao().getCategorySummary()
     val totalExpense: Flow<Long> = db.billDao().getTotalExpense()
+
+    val currentFunds: Flow<CurrentFunds?> = db.currentFundsDao().observe()
+
+    suspend fun saveCurrentFunds(funds: CurrentFunds) = db.currentFundsDao().save(funds)
 
     suspend fun insertBill(bill: BillItem) = db.billDao().insert(bill)
     suspend fun updateBill(bill: BillItem) = db.billDao().update(bill)

@@ -53,7 +53,8 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     vm: LedgerViewModel,
     snackbarHostState: SnackbarHostState,
-    onOpenMoreFeatures: () -> Unit
+    onOpenMoreFeatures: () -> Unit,
+    onOpenCategoryExpenses: (String) -> Unit
 ) {
     val tabs = remember { listOf("支出总览", "记录支出", "录入收入") }
     val pagerState = rememberPagerState { tabs.size }
@@ -143,7 +144,7 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f)
             ) { page ->
                 when (page) {
-                    0 -> ExpenseSummaryTab(vm)
+                    0 -> ExpenseSummaryTab(vm, onOpenCategoryExpenses)
                     1 -> ImportBillTab(
                         vm,
                         onEditBill = { billToEdit = it },

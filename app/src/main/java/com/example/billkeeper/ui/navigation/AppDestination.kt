@@ -22,3 +22,13 @@ data object ReminderSettingsDestination : AppDestination
 
 @Serializable
 data object AppearanceSettingsDestination : AppDestination
+
+@Serializable
+data object CurrentFundsDestination : AppDestination
+
+@Serializable
+data class CategoryExpensesDestination(
+    val category: String,
+    val year: Int,
+    val month: Int
+) : AppDestination

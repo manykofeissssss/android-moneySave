@@ -5,6 +5,7 @@ import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 class LedgerEntryFormTest {
@@ -39,6 +40,21 @@ class LedgerEntryFormTest {
 
         assertEquals(
             LocalDateTime.of(2026, 8, 10, 14, 35, 27),
+            Instant.ofEpochMilli(result).atZone(zoneId).toLocalDateTime()
+        )
+    }
+
+    @Test
+    fun withLocalTime_preservesSelectedDate() {
+        val selectedDate = LocalDate.of(2026, 10, 5)
+            .atStartOfDay(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        val result = selectedDate.withLocalTime(LocalTime.of(18, 30), zoneId)
+
+        assertEquals(
+            LocalDateTime.of(2026, 10, 5, 18, 30),
             Instant.ofEpochMilli(result).atZone(zoneId).toLocalDateTime()
         )
     }

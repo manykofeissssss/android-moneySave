@@ -8,6 +8,8 @@ import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.local.entity.MonthlyBudget
 import com.example.billkeeper.data.local.entity.RecurringEntry
+import com.example.billkeeper.data.repository.LedgerRepository
+import com.example.billkeeper.viewmodel.LedgerViewModel
 import com.example.billkeeper.domain.recurring.RecurringEntryType
 import com.example.billkeeper.domain.recurring.RecurringFrequency
 import kotlinx.coroutines.flow.first
@@ -18,11 +20,48 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val databaseName = "migration-test.db"
+
+    @Test
+    fun categoryExpenses_keepsSelectedMonthAndRefreshesAfterRecordChanges() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        val zone = ZoneId.systemDefault()
+        fun atMidnight(month: Int, day: Int): Long = LocalDate.of(2026, month, day)
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+        val first = BillItem(id = 1, category = "餐饮", amountCents = 1250L, date = atMidnight(9, 1))
+        val last = BillItem(id = 2, category = "餐饮", amountCents = 2000L, date = atMidnight(10, 1) - 1L)
+
+        try {
+            database.billDao().insert(first)
+            database.billDao().insert(last)
+            database.billDao().insert(BillItem(id = 3, category = "餐饮", amountCents = 9999L, date = atMidnight(9, 1) - 1L))
+            database.billDao().insert(BillItem(id = 4, category = "餐饮", amountCents = 9999L, date = atMidnight(10, 1)))
+            database.billDao().insert(BillItem(id = 5, category = "交通", amountCents = 800L, date = atMidnight(9, 5)))
+            val vm = LedgerViewModel(LedgerRepository(database))
+            val expenses = vm.observeCategoryExpenses("餐饮", 2026, 9)
+
+            val initial = expenses.first()
+            assertEquals(listOf(last, first), initial.bills)
+            assertEquals(3250L, initial.totalExpenseCents)
+            assertEquals(2, initial.entryCount)
+
+            val updated = first.copy(amountCents = 1500L)
+            database.billDao().update(updated)
+            assertEquals(3500L, expenses.first().totalExpenseCents)
+            database.billDao().delete(last)
+            assertEquals(listOf(updated), expenses.first().bills)
+            database.billDao().update(updated.copy(category = "交通"))
+            assertEquals(0, expenses.first().entryCount)
+        } finally {
+            database.close()
+        }
+    }
 
     @Before
     fun deleteExistingDatabase() {
@@ -43,7 +82,8 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
-                AppDatabase.MIGRATION_4_5
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6
             )
             .build()
 
@@ -79,7 +119,8 @@ class AppDatabaseMigrationTest {
             .addMigrations(
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
-                AppDatabase.MIGRATION_4_5
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6
             )
             .build()
 
@@ -116,7 +157,7 @@ class AppDatabaseMigrationTest {
         createVersionThreeDatabase()
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
+            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
             .build()
         val recurringEntry = RecurringEntry(
             id = 11,
@@ -164,7 +205,7 @@ class AppDatabaseMigrationTest {
         createVersionFourDatabase()
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_4_5)
+            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
             .build()
 
         try {

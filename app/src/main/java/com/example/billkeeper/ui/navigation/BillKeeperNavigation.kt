@@ -27,6 +27,8 @@ import com.example.billkeeper.background.BackgroundPreferences
 import com.example.billkeeper.ui.background.BackgroundSettingsScreen
 import com.example.billkeeper.ui.screen.DailyLedgerScreen
 import com.example.billkeeper.ui.screen.HomeScreen
+import com.example.billkeeper.ui.screen.CurrentFundsScreen
+import com.example.billkeeper.ui.screen.CategoryExpensesScreen
 import com.example.billkeeper.ui.screen.MoreFeaturesScreen
 import com.example.billkeeper.ui.screen.RecurringEntryScreen
 import com.example.billkeeper.ui.screen.ReminderSettingsScreen
@@ -60,7 +62,16 @@ fun BillKeeperNavigation(
                 HomeScreen(
                     vm = ledgerViewModel,
                     snackbarHostState = snackbarHostState,
-                    onOpenMoreFeatures = { backStack.add(MoreFeaturesDestination) }
+                    onOpenMoreFeatures = { backStack.add(MoreFeaturesDestination) },
+                    onOpenCategoryExpenses = { category ->
+                        backStack.add(
+                            CategoryExpensesDestination(
+                                category = category,
+                                year = ledgerViewModel.selectedYear.value,
+                                month = ledgerViewModel.selectedMonth.value + 1
+                            )
+                        )
+                    }
                 )
             }
             entry<MoreFeaturesDestination> {
@@ -73,7 +84,8 @@ fun BillKeeperNavigation(
                         onOpenDailyLedger = { backStack.add(DailyLedgerDestination) },
                         onOpenRecurringEntries = { backStack.add(RecurringEntriesDestination) },
                         onOpenReminderSettings = { backStack.add(ReminderSettingsDestination) },
-                        onOpenAppearanceSettings = { backStack.add(AppearanceSettingsDestination) }
+                        onOpenAppearanceSettings = { backStack.add(AppearanceSettingsDestination) },
+                        onOpenCurrentFunds = { backStack.add(CurrentFundsDestination) }
                     )
                 }
             }
@@ -122,6 +134,30 @@ fun BillKeeperNavigation(
                     )
                 }
             }
+            entry<CurrentFundsDestination> {
+                FeaturePageScaffold(
+                    title = "现有资金",
+                    onBack = navigateBack,
+                    snackbarHostState = snackbarHostState
+                ) {
+                    CurrentFundsScreen(ledgerViewModel)
+                }
+            }
+            entry<CategoryExpensesDestination> { destination ->
+                FeaturePageScaffold(
+                    title = "${destination.category}支出",
+                    onBack = navigateBack,
+                    snackbarHostState = snackbarHostState,
+                    backContentDescription = "返回支出总览"
+                ) {
+                    CategoryExpensesScreen(
+                        vm = ledgerViewModel,
+                        category = destination.category,
+                        year = destination.year,
+                        month = destination.month
+                    )
+                }
+            }
         }
     )
 }
@@ -132,6 +168,7 @@ private fun FeaturePageScaffold(
     title: String,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,
+    backContentDescription: String = "返回更多功能",
     content: @Composable () -> Unit
 ) {
     Scaffold(
@@ -141,7 +178,7 @@ private fun FeaturePageScaffold(
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回更多功能")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = backContentDescription)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

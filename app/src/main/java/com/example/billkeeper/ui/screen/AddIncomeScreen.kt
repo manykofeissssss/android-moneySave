@@ -63,6 +63,7 @@ fun AddIncomeTab(
                 optionLabel = "来源",
                 options = INCOME_SOURCES,
                 actionColor = Color(0xFF2E7D32),
+                enableTimeSelection = true,
                 onSubmit = { source, amountCents, note, date ->
                     vm.addIncome(source, amountCents, note, date)
                 }

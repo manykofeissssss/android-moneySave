@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
@@ -72,9 +73,9 @@ fun BottomSummaryItem(label: String, amountCents: Long, color: Color) {
 }
 
 @Composable
-fun CategoryRow(cat: CategorySummary) {
+fun CategoryRow(cat: CategorySummary, onClick: () -> Unit) {
     val color = CATEGORY_COLORS[cat.category] ?: MaterialTheme.colorScheme.outline
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -90,7 +91,11 @@ fun CategoryRow(cat: CategorySummary) {
                 Spacer(Modifier.width(12.dp))
                 Text(cat.category, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
-            Text(formatCurrency(cat.totalCents), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(formatCurrency(cat.totalCents), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ChevronRight, contentDescription = "查看${cat.category}支出明细")
+            }
         }
     }
 }
@@ -98,8 +103,8 @@ fun CategoryRow(cat: CategorySummary) {
 @Composable
 fun BillRow(
     bill: BillItem,
-    onEdit: (BillItem) -> Unit,
-    onDelete: (BillItem) -> Unit
+    onEdit: ((BillItem) -> Unit)? = null,
+    onDelete: ((BillItem) -> Unit)? = null
 ) {
     val color = CATEGORY_COLORS[bill.category] ?: MaterialTheme.colorScheme.outline
     val df = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
@@ -122,12 +127,16 @@ fun BillRow(
                 Text("$prefix$timeStr", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
             Text("- ${formatCurrency(bill.amountCents)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
-            Spacer(Modifier.width(4.dp))
-            IconButton(onClick = { onEdit(bill) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            if (onEdit != null || onDelete != null) Spacer(Modifier.width(4.dp))
+            if (onEdit != null) {
+                IconButton(onClick = { onEdit(bill) }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
             }
-            IconButton(onClick = { onDelete(bill) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color(0xFFC62828), modifier = Modifier.size(18.dp))
+            if (onDelete != null) {
+                IconButton(onClick = { onDelete(bill) }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color(0xFFC62828), modifier = Modifier.size(18.dp))
+                }
             }
         }
     }

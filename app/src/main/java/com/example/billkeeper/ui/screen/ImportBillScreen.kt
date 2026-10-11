@@ -63,6 +63,7 @@ fun ImportBillTab(
                 optionLabel = "类别",
                 options = EXPENSE_CATEGORIES,
                 actionColor = Color(0xFFC62828),
+                enableTimeSelection = true,
                 onSubmit = { category, amountCents, note, date ->
                     vm.addBill(category, amountCents, note, date)
                 }

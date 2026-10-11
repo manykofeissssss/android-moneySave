@@ -6,10 +6,12 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.billkeeper.data.local.dao.BillDao
+import com.example.billkeeper.data.local.dao.CurrentFundsDao
 import com.example.billkeeper.data.local.dao.IncomeDao
 import com.example.billkeeper.data.local.dao.MonthlyBudgetDao
 import com.example.billkeeper.data.local.dao.RecurringEntryDao
 import com.example.billkeeper.data.local.entity.BillItem
+import com.example.billkeeper.data.local.entity.CurrentFunds
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.local.entity.MonthlyBudget
 import com.example.billkeeper.data.local.entity.RecurringEntry
@@ -17,16 +19,18 @@ import com.example.billkeeper.data.local.entity.RecurringEntry
 @Database(
     entities = [
         BillItem::class,
+        CurrentFunds::class,
         IncomeItem::class,
         MonthlyBudget::class,
         RecurringEntry::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(RecurringEntryConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun billDao(): BillDao
+    abstract fun currentFundsDao(): CurrentFundsDao
     abstract fun incomeDao(): IncomeDao
     abstract fun monthlyBudgetDao(): MonthlyBudgetDao
     abstract fun recurringEntryDao(): RecurringEntryDao
@@ -133,6 +137,21 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE recurring_entries " +
                             "ADD COLUMN executionMinute INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS current_funds (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        amountCents INTEGER NOT NULL,
+                        incomeSnapshotCents INTEGER NOT NULL,
+                        expenseSnapshotCents INTEGER NOT NULL
+                    )
+                    """.trimIndent()
                 )
             }
         }

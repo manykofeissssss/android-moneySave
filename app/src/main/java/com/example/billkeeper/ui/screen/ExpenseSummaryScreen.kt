@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -50,7 +49,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,7 +65,6 @@ import com.example.billkeeper.ui.shared.LedgerEntryForm
 import com.example.billkeeper.ui.theme.EXPENSE_CATEGORIES
 import com.example.billkeeper.ui.theme.INCOME_SOURCES
 import com.example.billkeeper.viewmodel.LedgerViewModel
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
@@ -582,17 +579,11 @@ private fun QuickEntrySheet(
 ) {
     var selectedType by remember { mutableIntStateOf(0) }
     val entryTypes = listOf("支出", "收入")
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-    val expandForInput = {
-        scope.launch { sheetState.expand() }
-        Unit
-    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         sheetState = sheetState,
-        onDismissRequest = onDismiss,
-        modifier = Modifier.imePadding()
+        onDismissRequest = onDismiss
     ) {
         Column(
             modifier = Modifier
@@ -625,7 +616,6 @@ private fun QuickEntrySheet(
                     actionColor = Color(0xFFC62828),
                     allowDateSelection = false,
                     showTitle = false,
-                    onInputFocus = expandForInput,
                     onSubmit = { category, amountCents, note, date ->
                         vm.addBill(category, amountCents, note, date)
                         onDismiss()
@@ -639,7 +629,6 @@ private fun QuickEntrySheet(
                     actionColor = Color(0xFF2E7D32),
                     allowDateSelection = false,
                     showTitle = false,
-                    onInputFocus = expandForInput,
                     onSubmit = { source, amountCents, note, date ->
                         vm.addIncome(source, amountCents, note, date)
                         onDismiss()

@@ -61,15 +61,13 @@ class RecurringEntryViewModel(
                 require(draft.executionHour in 0..23) { "执行小时必须在 0 到 23 之间" }
                 require(draft.executionMinute in 0..59) { "执行分钟必须在 0 到 59 之间" }
 
-                val existing = draft.id.takeIf { it != 0 }
-                    ?.let { repository.getRecurringEntryById(it) }
-                val nextRunAt = if (existing != null && !existing.hasScheduleChanged(draft)) {
-                    existing.nextRunAt
-                } else {
-                    calculateFirstRunAt(draft, existing?.lastExecutedAt)
-                }
-                val now = clock.millis()
-                repository.upsertRecurringEntry(
+                val isNew = repository.saveRecurringEntry(draft.id) { existing ->
+                    val nextRunAt = if (existing != null && !existing.hasScheduleChanged(draft)) {
+                        existing.nextRunAt
+                    } else {
+                        calculateFirstRunAt(draft, existing?.lastExecutedAt)
+                    }
+                    val now = clock.millis()
                     RecurringEntry(
                         id = existing?.id ?: 0,
                         entryType = draft.entryType,
@@ -90,9 +88,9 @@ class RecurringEntryViewModel(
                         executionHour = draft.executionHour,
                         executionMinute = draft.executionMinute
                     )
-                )
+                }
                 scheduler.enqueueImmediateCheck()
-                _messages.emit(if (existing == null) "周期记账已创建" else "周期记账已更新")
+                _messages.emit(if (isNew) "周期记账已创建" else "周期记账已更新")
             } catch (error: Exception) {
                 _messages.emit("保存失败：${error.localizedMessage ?: "未知错误"}")
             }
@@ -102,7 +100,7 @@ class RecurringEntryViewModel(
     fun setEnabled(entry: RecurringEntry, enabled: Boolean) {
         viewModelScope.launch {
             try {
-                repository.upsertRecurringEntry(entry.copy(enabled = enabled))
+                repository.setRecurringEntryEnabled(entry.id, enabled)
                 if (enabled) scheduler.enqueueImmediateCheck()
                 _messages.emit(if (enabled) "周期记账已启用" else "周期记账已暂停")
             } catch (error: Exception) {

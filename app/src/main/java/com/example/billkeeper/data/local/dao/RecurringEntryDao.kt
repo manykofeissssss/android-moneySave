@@ -26,6 +26,9 @@ interface RecurringEntryDao {
     @Upsert
     suspend fun upsert(entry: RecurringEntry)
 
+    @Query("UPDATE recurring_entries SET enabled = :enabled WHERE id = :id")
+    suspend fun setEnabled(id: Int, enabled: Boolean): Int
+
     @Query("DELETE FROM recurring_entries WHERE id = :id")
     suspend fun deleteById(id: Int)
 }

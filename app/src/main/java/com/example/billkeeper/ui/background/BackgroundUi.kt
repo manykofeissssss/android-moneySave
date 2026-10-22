@@ -77,6 +77,7 @@ import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
 import com.example.billkeeper.background.BackgroundPreferences
+import com.example.billkeeper.background.BackgroundImageSampling
 import com.example.billkeeper.background.AppearancePreferences
 import com.example.billkeeper.background.AppearanceSettings
 import com.example.billkeeper.background.BackgroundStyle
@@ -105,7 +106,7 @@ fun AppBackground(
 ) {
     val showImage = settings.backgroundStyle == BackgroundStyle.IMAGE && preferences.hasCustomBackground
     val image by rememberFileBitmap(
-        path = preferences.backgroundFile.absolutePath,
+        preferences = preferences,
         load = showImage,
         revision = revision
     )
@@ -194,9 +195,11 @@ fun BackgroundSettingsScreen(
 
     val preview by rememberUriBitmap(pendingUri)
     val currentBackground by rememberFileBitmap(
-        path = preferences.backgroundFile.absolutePath,
-        load = preferences.hasCustomBackground && !removeStoredImage,
-        revision = 0
+        preferences = preferences,
+        load = preferences.hasCustomBackground && !removeStoredImage && pendingUri == null,
+        revision = 0,
+        maxWidth = 1024,
+        maxHeight = 1024
     )
     val displayedPreview = preview ?: currentBackground
 
@@ -337,10 +340,10 @@ fun BackgroundSettingsScreen(
                     scope.launch {
                         runCatching {
                             pendingUri?.let { uri ->
-                                withContext(Dispatchers.IO) { preferences.saveBackground(uri) }
+                                preferences.saveBackground(uri)
                             }
                             if (removeStoredImage) {
-                                withContext(Dispatchers.IO) { preferences.clearBackground() }
+                                preferences.clearBackground()
                             }
                             appearancePreferences.update(
                                 AppearanceSettings(
@@ -542,14 +545,20 @@ private fun Color.readableTextColor(): Color =
     if (luminance() > 0.48f) Color(0xFF101410) else Color.White
 
 @Composable
-private fun rememberFileBitmap(path: String, load: Boolean, revision: Int) = produceState<ImageBitmap?>(
+private fun rememberFileBitmap(
+    preferences: BackgroundPreferences,
+    load: Boolean,
+    revision: Int,
+    maxWidth: Int = 1080,
+    maxHeight: Int = 1920
+) = produceState<ImageBitmap?>(
     initialValue = null,
-    key1 = path,
+    key1 = preferences,
     key2 = load,
-    key3 = revision
+    key3 = Triple(revision, maxWidth, maxHeight)
 ) {
     value = if (load) {
-        withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
+        preferences.loadBackgroundBitmap(maxWidth, maxHeight)?.asImageBitmap()
     } else {
         null
     }
@@ -561,8 +570,18 @@ private fun rememberUriBitmap(uri: Uri?) = run {
     produceState<ImageBitmap?>(initialValue = null, key1 = uri) {
         value = uri?.let {
             withContext(Dispatchers.IO) {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(it).use { stream ->
-                    stream?.let(BitmapFactory::decodeStream)?.asImageBitmap()
+                    BitmapFactory.decodeStream(stream, null, bounds)
+                }
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = BackgroundImageSampling.sampleSize(
+                        bounds.outWidth, bounds.outHeight, 1024, 1024
+                    )
+                }
+                context.contentResolver.openInputStream(it).use { stream ->
+                    BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
                 }
             }
         }

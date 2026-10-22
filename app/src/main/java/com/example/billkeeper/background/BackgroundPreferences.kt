@@ -1,6 +1,8 @@
 package com.example.billkeeper.background
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -8,9 +10,13 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
@@ -82,6 +88,17 @@ class AppearancePreferences(context: Context) {
 class BackgroundPreferences(context: Context) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val imageMutex = Mutex()
+    private var cachedImage: CachedBackgroundImage? = null
+
+    private data class CachedBackgroundImage(
+        val modifiedAt: Long,
+        val fileSize: Long,
+        val sourceWidth: Int,
+        val sourceHeight: Int,
+        val sampleSize: Int,
+        val bitmap: Bitmap
+    )
 
     val backgroundFile: File
         get() = File(appContext.filesDir, BACKGROUND_FILE_NAME)
@@ -89,33 +106,97 @@ class BackgroundPreferences(context: Context) {
     val hasCustomBackground: Boolean
         get() = preferences.getBoolean(KEY_CUSTOM_BACKGROUND, false) && backgroundFile.isFile
 
-    fun saveBackground(source: Uri) {
-        val temporaryFile = File(appContext.filesDir, "$BACKGROUND_FILE_NAME.tmp")
-        try {
-            appContext.contentResolver.openInputStream(source).use { input ->
-                requireNotNull(input) { "无法读取裁剪后的图片" }
-                temporaryFile.outputStream().use(input::copyTo)
-            }
-            check(temporaryFile.length() > 0L) { "裁剪后的图片为空" }
+    suspend fun loadBackgroundBitmap(maxWidth: Int = 1080, maxHeight: Int = 1920): Bitmap? =
+        withContext(Dispatchers.IO) {
+            imageMutex.withLock {
+                if (!hasCustomBackground) {
+                    cachedImage = null
+                    return@withLock null
+                }
+                val file = backgroundFile
+                val modifiedAt = file.lastModified()
+                val fileSize = file.length()
+                cachedImage?.let { cached ->
+                    if (cached.modifiedAt == modifiedAt && cached.fileSize == fileSize &&
+                        cached.sampleSize <= BackgroundImageSampling.sampleSize(
+                            cached.sourceWidth, cached.sourceHeight, maxWidth, maxHeight
+                        )
+                    ) {
+                        return@withLock cached.bitmap
+                    }
+                }
 
-            if (backgroundFile.exists() && !backgroundFile.delete()) {
-                error("无法替换原背景图片")
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(file.absolutePath, bounds)
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                    cachedImage = null
+                    return@withLock null
+                }
+                val sampleSize = BackgroundImageSampling.sampleSize(
+                    bounds.outWidth, bounds.outHeight, maxWidth, maxHeight
+                )
+                val bitmap = BitmapFactory.decodeFile(
+                    file.absolutePath,
+                    BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                )
+                cachedImage = bitmap?.let {
+                    CachedBackgroundImage(
+                        modifiedAt, fileSize, bounds.outWidth, bounds.outHeight, sampleSize, it
+                    )
+                }
+                bitmap
             }
-            check(temporaryFile.renameTo(backgroundFile)) { "无法保存背景图片" }
-            preferences.edit().putBoolean(KEY_CUSTOM_BACKGROUND, true).apply()
-        } finally {
-            temporaryFile.delete()
+        }
+
+    suspend fun saveBackground(source: Uri) = withContext(Dispatchers.IO) {
+        imageMutex.withLock {
+            val temporaryFile = File(appContext.filesDir, "$BACKGROUND_FILE_NAME.tmp")
+            try {
+                appContext.contentResolver.openInputStream(source).use { input ->
+                    requireNotNull(input) { "无法读取裁剪后的图片" }
+                    temporaryFile.outputStream().use(input::copyTo)
+                }
+                check(temporaryFile.length() > 0L) { "裁剪后的图片为空" }
+
+                if (backgroundFile.exists() && !backgroundFile.delete()) {
+                    error("无法替换原背景图片")
+                }
+                // The UI may still draw the old bitmap; release the cache reference without recycling it.
+                cachedImage = null
+                check(temporaryFile.renameTo(backgroundFile)) { "无法保存背景图片" }
+                preferences.edit().putBoolean(KEY_CUSTOM_BACKGROUND, true).apply()
+            } finally {
+                temporaryFile.delete()
+            }
         }
     }
 
-    fun clearBackground() {
-        backgroundFile.delete()
-        preferences.edit().remove(KEY_CUSTOM_BACKGROUND).apply()
+    suspend fun clearBackground() = withContext(Dispatchers.IO) {
+        imageMutex.withLock {
+            backgroundFile.delete()
+            cachedImage = null
+            preferences.edit().remove(KEY_CUSTOM_BACKGROUND).apply()
+        }
     }
 
     companion object {
         private const val PREFERENCES_NAME = "appearance_preferences"
         private const val KEY_CUSTOM_BACKGROUND = "custom_background"
         private const val BACKGROUND_FILE_NAME = "custom_background.jpg"
+    }
+}
+
+internal object BackgroundImageSampling {
+    fun sampleSize(sourceWidth: Int, sourceHeight: Int, maxWidth: Int, maxHeight: Int): Int {
+        require(sourceWidth > 0 && sourceHeight > 0 && maxWidth > 0 && maxHeight > 0)
+        var sampleSize = 1
+        // Round up so odd source dimensions also fit the decode bounds.
+        while (sampleSize < (1 shl 30) &&
+            ((sourceWidth.toLong() + sampleSize - 1) / sampleSize > maxWidth ||
+                (sourceHeight.toLong() + sampleSize - 1) / sampleSize > maxHeight)
+        ) {
+            sampleSize *= 2
+        }
+        return sampleSize
     }
 }

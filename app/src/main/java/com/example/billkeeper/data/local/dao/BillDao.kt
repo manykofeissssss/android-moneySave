@@ -29,15 +29,21 @@ interface BillDao {
     @Query("SELECT * FROM bills WHERE date >= :startMs AND date < :endMs ORDER BY date DESC")
     fun getByMonth(startMs: Long, endMs: Long): Flow<List<BillItem>>
 
+    @Query("SELECT * FROM bills WHERE category = :category AND date >= :startMs AND date < :endMs ORDER BY date DESC, id DESC")
+    fun getByCategoryAndMonth(category: String, startMs: Long, endMs: Long): Flow<List<BillItem>>
+
     @Query("SELECT category, SUM(amountCents) AS totalCents FROM bills GROUP BY category ORDER BY totalCents DESC")
     fun getCategorySummary(): Flow<List<CategorySummary>>
 
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM bills")
     fun getTotalExpense(): Flow<Long>
 
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM bills")
+    suspend fun getTotalExpenseSnapshot(): Long
+
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM bills WHERE date >= :startMs AND date < :endMs")
     fun getTotalExpenseByMonth(startMs: Long, endMs: Long): Flow<Long>
 
-    @Query("SELECT category, SUM(amountCents) AS totalCents FROM bills WHERE date >= :startMs AND date < :endMs GROUP BY category ORDER BY totalCents DESC")
+    @Query("SELECT category, SUM(amountCents) AS totalCents FROM bills WHERE date >= :startMs AND date < :endMs GROUP BY category ORDER BY totalCents DESC, category ASC")
     fun getCategorySummaryByMonth(startMs: Long, endMs: Long): Flow<List<CategorySummary>>
 }

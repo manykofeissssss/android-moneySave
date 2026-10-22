@@ -39,16 +39,16 @@ fun ImportBillTab(
     onDeleteBill: (BillItem) -> Unit
 ) {
     val bills by vm.monthlyBills.collectAsStateWithLifecycle()
+    val categorySummary by vm.monthlyCategorySummary.collectAsStateWithLifecycle()
     val fallbackColor = MaterialTheme.colorScheme.outline
-    val pieSlices = remember(bills, fallbackColor) {
-        bills.groupBy { it.category }
-            .map { (category, entries) ->
-                PieSlice(
-                    label = category,
-                    valueCents = entries.sumOf { it.amountCents },
-                    color = CATEGORY_COLORS[category] ?: fallbackColor
-                )
-            }
+    val pieSlices = remember(categorySummary, fallbackColor) {
+        categorySummary.map { summary ->
+            PieSlice(
+                label = summary.category,
+                valueCents = summary.totalCents,
+                color = CATEGORY_COLORS[summary.category] ?: fallbackColor
+            )
+        }
             .filter { it.valueCents > 0 }
     }
 

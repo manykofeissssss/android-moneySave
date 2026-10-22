@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.example.billkeeper.data.local.entity.IncomeItem
+import com.example.billkeeper.data.model.CategorySummary
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -28,8 +29,14 @@ interface IncomeDao {
     @Query("SELECT * FROM incomes WHERE date >= :startMs AND date < :endMs ORDER BY date DESC")
     fun getByMonth(startMs: Long, endMs: Long): Flow<List<IncomeItem>>
 
+    @Query("SELECT source AS category, SUM(amountCents) AS totalCents FROM incomes WHERE date >= :startMs AND date < :endMs GROUP BY source ORDER BY totalCents DESC, source ASC")
+    fun getSourceSummaryByMonth(startMs: Long, endMs: Long): Flow<List<CategorySummary>>
+
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM incomes")
     fun getTotalIncome(): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM incomes")
+    suspend fun getTotalIncomeSnapshot(): Long
 
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM incomes WHERE date >= :startMs AND date < :endMs")
     fun getTotalIncomeByMonth(startMs: Long, endMs: Long): Flow<Long>

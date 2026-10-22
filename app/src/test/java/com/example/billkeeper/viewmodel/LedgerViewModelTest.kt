@@ -9,13 +9,11 @@ import java.time.ZoneId
 
 class LedgerViewModelTest {
     @Test
-    fun categoryExpenses_filtersCategoryAndKeepsTotalsInSyncWithSortedRecords() {
+    fun categoryExpenses_keepsTotalsInSyncWithQueriedRecords() {
         val oldMeal = BillItem(id = 1, category = "餐饮", amountCents = 1250L, date = 100L)
         val newMeal = BillItem(id = 3, category = "餐饮", amountCents = 2300L, date = 200L)
         val sameTimeMeal = BillItem(id = 4, category = "餐饮", amountCents = 500L, date = 200L)
-        val transport = BillItem(id = 2, category = "交通", amountCents = 800L, date = 300L)
-
-        val state = categoryExpensesUiState(listOf(oldMeal, transport, newMeal, sameTimeMeal), "餐饮")
+        val state = CategoryExpensesUiState(listOf(sameTimeMeal, newMeal, oldMeal))
 
         assertEquals(listOf(sameTimeMeal, newMeal, oldMeal), state.bills)
         assertEquals(4050L, state.totalExpenseCents)
@@ -24,10 +22,7 @@ class LedgerViewModelTest {
 
     @Test
     fun categoryExpenses_hasZeroTotalsWhenCategoryHasNoRecords() {
-        val state = categoryExpensesUiState(
-            listOf(BillItem(id = 1, category = "交通", amountCents = 800L, date = 100L)),
-            "餐饮"
-        )
+        val state = CategoryExpensesUiState(emptyList())
 
         assertEquals(emptyList<BillItem>(), state.bills)
         assertEquals(0L, state.totalExpenseCents)

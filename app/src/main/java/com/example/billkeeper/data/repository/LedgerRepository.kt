@@ -18,7 +18,15 @@ class LedgerRepository(private val db: AppDatabase) {
 
     val currentFunds: Flow<CurrentFunds?> = db.currentFundsDao().observe()
 
-    suspend fun saveCurrentFunds(funds: CurrentFunds) = db.currentFundsDao().save(funds)
+    suspend fun saveCurrentFunds(amountCents: Long) = db.withTransaction {
+        db.currentFundsDao().save(
+            CurrentFunds(
+                amountCents = amountCents,
+                incomeSnapshotCents = db.incomeDao().getTotalIncomeSnapshot(),
+                expenseSnapshotCents = db.billDao().getTotalExpenseSnapshot()
+            )
+        )
+    }
 
     suspend fun insertBill(bill: BillItem) = db.billDao().insert(bill)
     suspend fun updateBill(bill: BillItem) = db.billDao().update(bill)
@@ -27,6 +35,9 @@ class LedgerRepository(private val db: AppDatabase) {
 
     fun getBillsByMonth(startMs: Long, endMs: Long): Flow<List<BillItem>> =
         db.billDao().getByMonth(startMs, endMs)
+
+    fun getBillsByCategoryAndMonth(category: String, startMs: Long, endMs: Long): Flow<List<BillItem>> =
+        db.billDao().getByCategoryAndMonth(category, startMs, endMs)
 
     fun getBillsBetween(startMs: Long, endExclusiveMs: Long): Flow<List<BillItem>> =
         db.billDao().getByMonth(startMs, endExclusiveMs)
@@ -63,6 +74,9 @@ class LedgerRepository(private val db: AppDatabase) {
     fun getIncomesByMonth(startMs: Long, endMs: Long): Flow<List<IncomeItem>> =
         db.incomeDao().getByMonth(startMs, endMs)
 
+    fun getIncomeSummaryByMonth(startMs: Long, endMs: Long): Flow<List<CategorySummary>> =
+        db.incomeDao().getSourceSummaryByMonth(startMs, endMs)
+
     fun getIncomesBetween(startMs: Long, endExclusiveMs: Long): Flow<List<IncomeItem>> =
         db.incomeDao().getByMonth(startMs, endExclusiveMs)
 
@@ -79,6 +93,23 @@ class LedgerRepository(private val db: AppDatabase) {
 
     suspend fun upsertRecurringEntry(entry: RecurringEntry) =
         db.recurringEntryDao().upsert(entry)
+
+    suspend fun saveRecurringEntry(
+        id: Int,
+        update: (RecurringEntry?) -> RecurringEntry
+    ): Boolean = db.withTransaction {
+        val existing = if (id == 0) null else {
+            requireNotNull(db.recurringEntryDao().getById(id)) { "周期记账已不存在，请刷新后重试" }
+        }
+        db.recurringEntryDao().upsert(update(existing))
+        existing == null
+    }
+
+    suspend fun setRecurringEntryEnabled(id: Int, enabled: Boolean) {
+        check(db.recurringEntryDao().setEnabled(id, enabled) == 1) {
+            "周期记账已不存在，请刷新后重试"
+        }
+    }
 
     suspend fun deleteRecurringEntry(id: Int) =
         db.recurringEntryDao().deleteById(id)

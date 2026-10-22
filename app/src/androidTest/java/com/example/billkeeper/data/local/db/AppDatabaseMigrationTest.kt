@@ -2,18 +2,30 @@ package com.example.billkeeper.data.local.db
 
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.room.withTransaction
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.billkeeper.data.local.entity.BillItem
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.local.entity.MonthlyBudget
 import com.example.billkeeper.data.local.entity.RecurringEntry
+import com.example.billkeeper.data.model.CategorySummary
 import com.example.billkeeper.data.repository.LedgerRepository
 import com.example.billkeeper.viewmodel.LedgerViewModel
+import com.example.billkeeper.viewmodel.LedgerViewModelFactory
+import com.example.billkeeper.viewmodel.calculateRemainingFunds
 import com.example.billkeeper.domain.recurring.RecurringEntryType
 import com.example.billkeeper.domain.recurring.RecurringFrequency
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -51,6 +63,11 @@ class AppDatabaseMigrationTest {
             assertEquals(3250L, initial.totalExpenseCents)
             assertEquals(2, initial.entryCount)
 
+            val sameTime = last.copy(id = 6, amountCents = 500L)
+            database.billDao().insert(sameTime)
+            assertEquals(listOf(sameTime, last, first), expenses.first().bills)
+            database.billDao().delete(sameTime)
+
             val updated = first.copy(amountCents = 1500L)
             database.billDao().update(updated)
             assertEquals(3500L, expenses.first().totalExpenseCents)
@@ -58,6 +75,126 @@ class AppDatabaseMigrationTest {
             assertEquals(listOf(updated), expenses.first().bills)
             database.billDao().update(updated.copy(category = "交通"))
             assertEquals(0, expenses.first().entryCount)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun monthlySummaries_groupOnlySelectedMonthAndRefreshAfterEdits() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        val repository = LedgerRepository(database)
+        val start = 100L
+        val end = 200L
+        val bill = BillItem(id = 1, category = "餐饮", amountCents = 1_250L, date = start)
+        val income = IncomeItem(id = 1, source = "工资", amountCents = 5_000L, date = start)
+        try {
+            val expenses = repository.getCategorySummaryByMonth(start, end)
+            val incomes = repository.getIncomeSummaryByMonth(start, end)
+            assertEquals(emptyList<CategorySummary>(), expenses.first())
+            assertEquals(emptyList<CategorySummary>(), incomes.first())
+            repository.insertBill(bill)
+            repository.insertBill(bill.copy(id = 2, amountCents = 750L, date = end - 1))
+            repository.insertBill(bill.copy(id = 3, category = "交通", amountCents = 800L))
+            repository.insertIncome(income)
+            repository.insertIncome(income.copy(id = 2, amountCents = 500L, date = end - 1))
+            repository.insertIncome(income.copy(id = 3, source = "奖金", amountCents = 1_000L))
+            // Neither side of the selected month's [start, end) boundary may leak into totals.
+            for ((index, date) in listOf(start - 1, end).withIndex()) {
+                repository.insertBill(bill.copy(id = index + 4, amountCents = 99_999L, date = date))
+                repository.insertIncome(income.copy(id = index + 4, amountCents = 99_999L, date = date))
+            }
+            assertEquals(
+                listOf(CategorySummary("餐饮", 2_000L), CategorySummary("交通", 800L)),
+                expenses.first()
+            )
+            assertEquals(
+                listOf(CategorySummary("工资", 5_500L), CategorySummary("奖金", 1_000L)),
+                incomes.first()
+            )
+            repository.updateBill(bill.copy(category = "交通"))
+            repository.updateIncome(income.copy(source = "奖金"))
+            assertEquals(
+                listOf(CategorySummary("交通", 2_050L), CategorySummary("餐饮", 750L)),
+                expenses.first()
+            )
+            assertEquals(
+                listOf(CategorySummary("奖金", 6_000L), CategorySummary("工资", 500L)),
+                incomes.first()
+            )
+            repository.deleteBill(bill.copy(id = 2))
+            repository.deleteIncome(income.copy(id = 2))
+            assertEquals(listOf(CategorySummary("交通", 2_050L)), expenses.first())
+            assertEquals(listOf(CategorySummary("奖金", 6_000L)), incomes.first())
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun currentFunds_resetAfterIncomeAndExpenseChanges_preservesTheCurrentBalance() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        val repository = LedgerRepository(database)
+        val store = ViewModelStore()
+        val vm = ViewModelProvider(store, LedgerViewModelFactory(repository))[LedgerViewModel::class.java]
+        try {
+            repository.saveCurrentFunds(10_000)
+            repository.insertBill(BillItem(category = "餐饮", amountCents = 2_000, date = 1L))
+            withTimeout(5_000) { vm.remainingFundsCents.first { it == 8_000L } }
+            repository.insertIncome(IncomeItem(source = "工资", amountCents = 500, date = 2L))
+            val currentBalance = withTimeout(5_000) {
+                vm.remainingFundsCents.first { it == 8_500L }
+            }
+
+            repository.saveCurrentFunds(currentBalance)
+            val saved = requireNotNull(repository.currentFunds.first())
+            assertEquals(8_500L, saved.amountCents)
+            assertEquals(500L, saved.incomeSnapshotCents)
+            assertEquals(2_000L, saved.expenseSnapshotCents)
+
+            repository.insertBill(BillItem(category = "交通", amountCents = 500, date = 3L))
+            withTimeout(5_000) { vm.remainingFundsCents.first { it == 8_000L } }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { store.clear() }
+            database.close()
+        }
+    }
+
+    @Test
+    fun currentFunds_concurrentLedgerTransaction_cannotSplitIncomeAndExpenseSnapshots() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        val repository = LedgerRepository(database)
+        try {
+            repeat(10) { index ->
+                val start = CompletableDeferred<Unit>()
+                coroutineScope {
+                    val saveFunds = async(Dispatchers.Default) {
+                        start.await()
+                        repository.saveCurrentFunds(10_000)
+                    }
+                    val ledgerChange = async(Dispatchers.Default) {
+                        start.await()
+                        database.withTransaction {
+                            repository.insertIncome(
+                                IncomeItem(source = "工资", amountCents = 1_000, date = index.toLong())
+                            )
+                            repository.insertBill(
+                                BillItem(category = "餐饮", amountCents = 1_000, date = index.toLong())
+                            )
+                        }
+                    }
+                    start.complete(Unit)
+                    saveFunds.await()
+                    ledgerChange.await()
+                }
+
+                val saved = requireNotNull(repository.currentFunds.first())
+                assertEquals(saved.incomeSnapshotCents, saved.expenseSnapshotCents)
+                assertEquals(
+                    10_000L,
+                    calculateRemainingFunds(saved, repository.totalIncome.first(), repository.totalExpense.first())
+                )
+            }
         } finally {
             database.close()
         }

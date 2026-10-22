@@ -39,16 +39,16 @@ fun AddIncomeTab(
     onDeleteIncome: (IncomeItem) -> Unit
 ) {
     val incomes by vm.monthlyIncomes.collectAsStateWithLifecycle()
+    val sourceSummary by vm.monthlyIncomeSummary.collectAsStateWithLifecycle()
     val fallbackColor = MaterialTheme.colorScheme.outline
-    val pieSlices = remember(incomes, fallbackColor) {
-        incomes.groupBy { it.source }
-            .map { (source, entries) ->
-                PieSlice(
-                    label = source,
-                    valueCents = entries.sumOf { it.amountCents },
-                    color = INCOME_COLORS[source] ?: fallbackColor
-                )
-            }
+    val pieSlices = remember(sourceSummary, fallbackColor) {
+        sourceSummary.map { summary ->
+            PieSlice(
+                label = summary.category,
+                valueCents = summary.totalCents,
+                color = INCOME_COLORS[summary.category] ?: fallbackColor
+            )
+        }
             .filter { it.valueCents > 0 }
     }
 

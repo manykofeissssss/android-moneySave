@@ -8,6 +8,7 @@ import com.example.billkeeper.data.local.entity.CurrentFunds
 import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.model.CategorySummary
 import com.example.billkeeper.data.repository.LedgerRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -49,7 +50,7 @@ data class BudgetProgressUi(
 )
 
 data class CategoryExpensesUiState(val bills: List<BillItem>) {
-    val totalExpenseCents: Long get() = bills.sumOf { it.amountCents }
+    val totalExpenseCents: Long = bills.sumOf { it.amountCents }
     val entryCount: Int get() = bills.size
 }
 
@@ -137,17 +138,13 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         month: Int
     ): Flow<CategoryExpensesUiState> {
         val (start, endExclusive) = monthRangeMillis(year, month - 1)
-        return repo.getBillsByMonth(start, endExclusive).map { bills ->
-            categoryExpensesUiState(bills, category)
-        }
+        return repo.getBillsByCategoryAndMonth(category, start, endExclusive)
+            .map(::CategoryExpensesUiState)
+            .flowOn(Dispatchers.Default)
     }
 
-    val monthlyCategorySummary: StateFlow<List<CategorySummary>> = monthlyBills.map { bills ->
-        bills.groupBy { it.category }
-            .map { (category, entries) ->
-                CategorySummary(category = category, totalCents = entries.sumOf { it.amountCents })
-            }
-            .sortedByDescending { it.totalCents }
+    val monthlyCategorySummary: StateFlow<List<CategorySummary>> = monthRange.flatMapLatest { (start, endExclusive) ->
+        repo.getCategorySummaryByMonth(start, endExclusive)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val monthlyBudgetProgress: StateFlow<List<BudgetProgressUi>> =
@@ -181,16 +178,20 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
         )
 
 
-    val monthlyTotalExpense: StateFlow<Long> = monthlyBills.map { bills ->
-        bills.sumOf { it.amountCents }
+    val monthlyTotalExpense: StateFlow<Long> = monthlyCategorySummary.map { summary ->
+        summary.sumOf { it.totalCents }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     val monthlyIncomes: StateFlow<List<IncomeItem>> = monthRange.flatMapLatest { (start, endExclusive) ->
         repo.getIncomesByMonth(start, endExclusive)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val monthlyTotalIncome: StateFlow<Long> = monthlyIncomes.map { incomes ->
-        incomes.sumOf { it.amountCents }
+    val monthlyIncomeSummary: StateFlow<List<CategorySummary>> = monthRange.flatMapLatest { (start, endExclusive) ->
+        repo.getIncomeSummaryByMonth(start, endExclusive)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyTotalIncome: StateFlow<Long> = monthlyIncomeSummary.map { summary ->
+        summary.sumOf { it.totalCents }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     val prevMonthTotalExpense: StateFlow<Long> = prevMonthRange.flatMapLatest { (start, endExclusive) ->
@@ -259,15 +260,7 @@ class LedgerViewModel(private val repo: LedgerRepository) : ViewModel() {
     fun updateCurrentFunds(amountCents: Long) {
         viewModelScope.launch {
             try {
-                val incomeSnapshotCents = repo.totalIncome.first()
-                val expenseSnapshotCents = repo.totalExpense.first()
-                repo.saveCurrentFunds(
-                    CurrentFunds(
-                        amountCents = amountCents,
-                        incomeSnapshotCents = incomeSnapshotCents,
-                        expenseSnapshotCents = expenseSnapshotCents
-                    )
-                )
+                repo.saveCurrentFunds(amountCents)
                 _snackbarEvents.emit(LedgerSnackbarEvent("现有资金已更新"))
             } catch (e: Exception) {
                 _snackbarEvents.emit(LedgerSnackbarEvent("更新失败：${e.localizedMessage ?: "未知错误"}"))
@@ -477,14 +470,6 @@ internal fun calculateRemainingFunds(
     it.amountCents + (currentIncomeCents - it.incomeSnapshotCents) -
         (currentExpenseCents - it.expenseSnapshotCents)
 } ?: 0L
-
-internal fun categoryExpensesUiState(
-    monthlyBills: List<BillItem>,
-    category: String
-): CategoryExpensesUiState = CategoryExpensesUiState(
-    bills = monthlyBills.filter { it.category == category }
-        .sortedWith(compareByDescending<BillItem> { it.date }.thenByDescending { it.id })
-)
 
 internal fun yearMonthForMillis(
     timestamp: Long,

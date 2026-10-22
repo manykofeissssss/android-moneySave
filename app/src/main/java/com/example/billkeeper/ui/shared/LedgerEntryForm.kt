@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.billkeeper.data.model.isValidYuanInput
 import com.example.billkeeper.data.model.parseYuanToCents
 import java.time.Instant
 import java.time.LocalDate
@@ -146,8 +147,10 @@ fun LedgerEntryForm(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = {
-                    amountText = it
-                    amountError = null
+                    if (isValidYuanInput(it)) {
+                        amountText = it
+                        amountError = null
+                    }
                 },
                 label = { Text("金额") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

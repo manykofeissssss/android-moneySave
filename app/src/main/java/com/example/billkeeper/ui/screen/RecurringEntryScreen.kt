@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.billkeeper.data.local.entity.RecurringEntry
 import com.example.billkeeper.data.model.centsToYuanText
 import com.example.billkeeper.data.model.formatCurrency
+import com.example.billkeeper.data.model.isValidYuanInput
 import com.example.billkeeper.data.model.parseYuanToCents
 import com.example.billkeeper.domain.recurring.RecurringEntryType
 import com.example.billkeeper.domain.recurring.RecurringFrequency
@@ -339,8 +340,10 @@ private fun RecurringEntryDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = {
-                        amountText = it
-                        amountError = null
+                        if (isValidYuanInput(it)) {
+                            amountText = it
+                            amountError = null
+                        }
                     },
                     label = { Text("金额") },
                     leadingIcon = { Text("¥") },

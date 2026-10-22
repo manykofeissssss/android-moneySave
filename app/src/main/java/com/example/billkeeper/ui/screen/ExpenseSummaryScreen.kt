@@ -9,6 +9,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.billkeeper.data.model.isValidYuanInput
 import com.example.billkeeper.data.model.parseYuanToCents
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -512,8 +513,10 @@ private fun BudgetEditorDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = {
-                        amountText = it
-                        amountError = null
+                        if (isValidYuanInput(it)) {
+                            amountText = it
+                            amountError = null
+                        }
                     },
                     label = { Text("每月预算") },
                     leadingIcon = { Text("¥") },

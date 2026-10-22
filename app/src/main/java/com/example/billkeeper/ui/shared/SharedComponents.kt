@@ -56,6 +56,7 @@ import com.example.billkeeper.data.local.entity.IncomeItem
 import com.example.billkeeper.data.model.CategorySummary
 import com.example.billkeeper.data.model.centsToYuanText
 import com.example.billkeeper.data.model.formatCurrency
+import com.example.billkeeper.data.model.isValidYuanInput
 import com.example.billkeeper.data.model.parseYuanToCents
 import com.example.billkeeper.ui.theme.CATEGORY_COLORS
 import com.example.billkeeper.ui.theme.EXPENSE_CATEGORIES
@@ -224,8 +225,10 @@ fun EditBillDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = {
-                        amountText = it
-                        amountError = null
+                        if (isValidYuanInput(it)) {
+                            amountText = it
+                            amountError = null
+                        }
                     },
                     label = { Text("金额") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -306,8 +309,10 @@ fun EditIncomeDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = {
-                        amountText = it
-                        amountError = null
+                        if (isValidYuanInput(it)) {
+                            amountText = it
+                            amountError = null
+                        }
                     },
                     label = { Text("金额") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
